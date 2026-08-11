@@ -162,7 +162,7 @@
                 <select id="formStatus"><option value="pending">待跟进</option><option value="progress">进行中</option><option value="done">已完成</option></select>
             </div>
             <div class="form-group"><label>备注</label><textarea id="formNote" rows="3"></textarea></div>
-            <input type="hidden" id="formEditId"><input type="hidden" id="formRescheduleCount" value="0">
+            <input type="hidden" id="formEditId"><input type="hidden" id="formRescheduleCount" value="0"><input type="hidden" id="formWasOverdue" value="0">
             <div class="btn-group">
                 <button class="btn btn-outline" onclick="closeModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveTask()">💾 保存</button>
@@ -175,7 +175,7 @@
         // ====== 最终修正的配置信息 ======
         const STORAGE_KEY = 'my_purchase_tasks';
         const BIN_ID = '6a7af37ef5f4af5e29068975';  // 您的仓库ID
-        const API_KEY = '$2a$10$c/WS5/Q7Qhve2SOyX1tBheXQhPGIQ4fDhvNcm6hoOIqN77H.2txgu'; // 您的密钥
+        const API_KEY = '$2a$10$c/WS5/Q7Qhve2SOyX1tBheXQhPGIQ4fDhvNcm6hoOIqN77H.2txgu'; // 您的Master Key（已修正）
         
         let tasks = [];
         let APP_PASSWORD = localStorage.getItem('my_app_pwd') || 'admin123';
@@ -329,6 +329,7 @@
             document.getElementById('formNote').value = data ? data.note : '';
             document.getElementById('formEditId').value = data ? data.id : '';
             document.getElementById('formRescheduleCount').value = data ? data.rescheduleCount || 0 : 0;
+            document.getElementById('formWasOverdue').value = isOver ? '1' : '0';
         }
         function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
 
@@ -338,7 +339,16 @@
             if (!title || !party) { showToast('请填写标题和供应商', 'error'); return; }
 
             let id = document.getElementById('formEditId').value;
-            let isOver = document.getElementById('formFollowDate').value < getToday() && document.getElementById('formStatus').value !== 'done';
+            // 用打开弹窗时记录的状态判断是否需要"重新安排"，而不是重新计算——
+            // 避免新建任务/编辑非逾期任务时，因为表单里的跟进日恰好早于今天而被误判成"逾期重新安排"
+            let isOver = document.getElementById('formWasOverdue').value === '1';
+
+            // 先校验，校验不通过直接return，此时还没动tasks数组，不会产生幽灵记录
+            let newDate = '';
+            if (isOver) {
+                newDate = document.getElementById('formRescheduleDate').value;
+                if (!newDate) { showToast('请选择新日期', 'error'); return; }
+            }
 
             let data = {
                 title, party, type: document.getElementById('formType').value,
@@ -359,8 +369,6 @@
 
             // 专门处理逾期重新安排
             if (isOver) {
-                let newDate = document.getElementById('formRescheduleDate').value;
-                if (!newDate) { showToast('请选择新日期', 'error'); return; }
                 let idx = tasks.findIndex(x => x.id === (id || data.id));
                 if (idx !== -1) {
                     tasks[idx].rescheduleDate = newDate;
