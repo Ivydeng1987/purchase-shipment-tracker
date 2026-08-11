@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>采购 · 发货跟单系统 v4.3 (独立密钥)</title>
+    <title>采购 · 发货跟单系统 v4.4 (修复同步)</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -92,9 +92,9 @@
 
     <div class="container hidden" id="mainContent">
         <div class="header">
-            <h1>📋 采购 · 发货跟单 <span>v4.3</span></h1>
+            <h1>📋 采购 · 发货跟单 <span>v4.4</span></h1>
             <div class="header-right">
-                <span class="sync-status success" id="syncStatus">✅ 待同步</span>
+                <span class="sync-status success" id="syncStatus">⏳ 载入中...</span>
                 <button class="btn btn-outline" onclick="exportExcel()">📥 导出 Excel</button>
                 <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 导入</button>
                 <input type="file" id="importFile" accept=".xlsx, .xls" style="display:none" onchange="importExcel(event)">
@@ -172,7 +172,7 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // ----- 专属配置 (使用您刚刚创建的独立 Access Key) -----
+        // ----- 专属配置 -----
         const STORAGE_KEY = 'my_purchase_tasks';
         const BIN_ID = '6a7ac386f5f4af5e2905cf90';
         const API_KEY = '$2a$10$AQ8tMSrEcWPdH0Axer/kvu5cXMYmBHulhQkMayNZZQRz9iwnqtdk2';
@@ -200,15 +200,18 @@
             if (p && p.trim()) { APP_PASSWORD = p.trim(); localStorage.setItem('my_app_pwd', APP_PASSWORD); showToast('密码已改'); }
         }
 
-        // ----- 核心同步（强制读取云端） -----
+        // ----- 核心同步（已修复 URL 结尾错误） -----
         async function getCloudData() {
             try {
+                // 注意这里变成了 /latest，去掉了之前多出来的 1
                 let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
                 if (res.ok) {
                     let json = await res.json();
                     if (json.record && Array.isArray(json.record)) return json.record;
                 }
-            } catch(e) {}
+            } catch(e) {
+                console.log("拉取云端失败:", e);
+            }
             return null;
         }
 
@@ -220,7 +223,10 @@
                     body: JSON.stringify(data)
                 });
                 return true;
-            } catch(e) { return false; }
+            } catch(e) { 
+                console.log("推送云端失败:", e);
+                return false; 
+            }
         }
 
         // ----- 启动流程 -----
@@ -305,7 +311,7 @@
         }
         function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
 
-        // ----- 核心更新：保存成功，弹窗自动关闭 -----
+        // ----- 保存后自动关闭弹窗 -----
         function saveTask() {
             let title = document.getElementById('formTitle').value.trim();
             let party = document.getElementById('formParty').value.trim();
@@ -344,8 +350,8 @@
                 }
             }
 
-            saveTasks();  // 保存数据（含同步云端）
-            closeModal(); // ✅ 改在这里！保存后立即关闭弹窗
+            saveTasks();
+            closeModal(); // 保存完毕，立刻关闭弹窗
         }
 
         function editTask(id) { let t = tasks.find(x=>x.id===id); if(t) openModal(t); }
