@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>采购 · 发货跟单系统 v4.5 (终极稳定版)</title>
+    <title>采购 · 发货跟单系统 v4.6 (终极强校验版)</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -92,7 +92,7 @@
 
     <div class="container hidden" id="mainContent">
         <div class="header">
-            <h1>📋 采购 · 发货跟单 <span>v4.5</span></h1>
+            <h1>📋 采购 · 发货跟单 <span>v4.6</span></h1>
             <div class="header-right">
                 <span class="sync-status success" id="syncStatus">⏳ 载入中...</span>
                 <button class="btn btn-outline" onclick="exportExcel()">📥 导出 Excel</button>
@@ -172,12 +172,10 @@
     <div class="toast" id="toast"></div>
 
     <script>
-        // ====== 配置信息 ======
+        // ====== 最终修正的配置信息 ======
         const STORAGE_KEY = 'my_purchase_tasks';
-        // 正确的 Access Key ID
-        const BIN_ID = '6a7ae07bf5f4af5e29063d23'; 
-        // 对应的 Access Key 密钥
-        const API_KEY = '$2a$10$AQ8tMSrEcWPdH0Axer/kvu5cXMYmBHulhQkMayNZZQRz9iwnqtdk2';
+        const BIN_ID = '6a7ae07bf5f4af5e29063d23';  // 您的仓库ID
+        const API_KEY = '$2a$10$AQ8tMSrEcWPdH0Axer/kvu5cXMYmBHulhQkMayNZZQRz9iwnqtdk2'; // 您的密钥
         
         let tasks = [];
         let APP_PASSWORD = localStorage.getItem('my_app_pwd') || 'admin123';
@@ -202,25 +200,28 @@
             if (p && p.trim()) { APP_PASSWORD = p.trim(); localStorage.setItem('my_app_pwd', APP_PASSWORD); showToast('密码已改'); }
         }
 
-        // ====== 核心同步（绝对稳定版） ======
+        // ====== 核心同步（含详细错误输出） ======
         async function getCloudData() {
             try {
+                console.log(`开始拉取云端数据: BIN_ID=${BIN_ID}`);
                 let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { 
                     headers: { 'X-Master-Key': API_KEY } 
                 });
                 if (res.ok) {
                     let json = await res.json();
                     if (json.record && Array.isArray(json.record)) return json.record;
+                } else {
+                    console.log(`拉取失败，状态码: ${res.status}`);
                 }
             } catch(e) {
-                console.log("拉取云端失败:", e);
+                console.log("拉取云端发生网络/解析错误:", e);
             }
             return null;
         }
 
         async function pushCloudData(data) {
             try {
-                // 注意：这里使用了 PUT 方法，它会覆盖云端现有的数据。只有新房间才能用这个。
+                console.log(`准备上传数据到云端: BIN_ID=${BIN_ID}`);
                 let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                     method: 'PUT',
                     headers: { 
@@ -230,19 +231,21 @@
                     body: JSON.stringify(data)
                 });
                 if(res.ok){
+                     console.log("数据上传成功！云端已更新。");
                      return true;
                 } else {
-                     console.log("上传失败，状态码:", res.status);
+                     console.error("上传失败，服务器返回错误码:", res.status, res.statusText);
                      return false;
                 }
             } catch(e) { 
-                console.log("推送云端失败:", e);
+                console.error("上传过程发生严重错误（网络不通、跨域等）:", e);
                 return false; 
             }
         }
 
         // ====== 启动流程 ======
         async function startApp() {
+            // 1. 尝试从云端拿数据
             let cloudTasks = await getCloudData();
             if (cloudTasks && cloudTasks.length > 0) {
                 tasks = cloudTasks;
@@ -250,9 +253,14 @@
                 document.getElementById('syncStatus').innerText = "✅ 已同步云端";
                 document.getElementById('syncStatus').className = "sync-status success";
             } else {
+                // 云端没数据，用本地缓存
                 let local = localStorage.getItem(STORAGE_KEY);
-                if (local) tasks = JSON.parse(local);
-                document.getElementById('syncStatus').innerText = "⚠️ 本地数据";
+                if (local) {
+                    tasks = JSON.parse(local);
+                    document.getElementById('syncStatus').innerText = "⚠️ 本地数据(云端无数据)";
+                } else {
+                    document.getElementById('syncStatus').innerText = "📂 空系统";
+                }
                 document.getElementById('syncStatus').className = "sync-status error";
             }
             render();
