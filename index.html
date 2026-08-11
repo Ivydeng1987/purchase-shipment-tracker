@@ -3,15 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>采购 · 发货跟单系统 v4.1 (强制同步)</title>
-    <!-- 引入 SheetJS 库用于 Excel 导出/导入 -->
+    <title>采购 · 发货跟单系统 v4.3 (独立密钥)</title>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     <style>
-        /* ===== 样式 ===== */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; padding: 16px; color: #1e293b; }
         .container { max-width: 1600px; margin: 0 auto; }
-
         .lock-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #0e4b6e, #1a6d97); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 24px; }
         .lock-screen .lock-box { background: white; padding: 32px 28px; border-radius: 24px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); text-align: center; max-width: 380px; width: 90%; }
         .lock-screen .lock-box h2 { font-size: 22px; color: #0e4b6e; margin-bottom: 6px; }
@@ -21,7 +18,7 @@
         .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; background: white; padding: 12px 18px; border-radius: 14px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
         .header h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
         .header h1 span { background: #0e4b6e; color: white; font-size: 12px; padding: 2px 10px; border-radius: 30px; font-weight: 400; }
-        .header-right { display: flex; align-items: center; gap: 10px; font-size: 13px; color: #64748b; flex-wrap: wrap; }
+        .header-right { display: flex; align-items: center; gap: 10px; font-size: 13px; flex-wrap: wrap; }
         .header-right .sync-status { font-weight: 500; font-size: 12px; padding: 4px 12px; border-radius: 20px; }
         .sync-status.success { background: #dcfce7; color: #16a34a; }
         .sync-status.error { background: #fee2e2; color: #dc2626; }
@@ -43,7 +40,6 @@
 
         .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
         .toolbar input[type="text"] { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 30px; font-size: 12px; outline: none; width: 180px; }
-        .toolbar input[type="text"]:focus { border-color: #0e4b6e; }
         .table-wrapper { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px; }
         th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
@@ -85,7 +81,6 @@
     </style>
 </head>
 <body>
-
     <div class="lock-screen" id="lockScreen">
         <div class="lock-box">
             <h2>🔒 跟单管理系统</h2>
@@ -97,13 +92,13 @@
 
     <div class="container hidden" id="mainContent">
         <div class="header">
-            <h1>📋 采购 · 发货跟单 <span>v4.1</span></h1>
+            <h1>📋 采购 · 发货跟单 <span>v4.3</span></h1>
             <div class="header-right">
-                <span class="sync-status success" id="syncStatus">✅ 已同步</span>
+                <span class="sync-status success" id="syncStatus">✅ 待同步</span>
                 <button class="btn btn-outline" onclick="exportExcel()">📥 导出 Excel</button>
-                <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 导入 Excel</button>
+                <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 导入</button>
                 <input type="file" id="importFile" accept=".xlsx, .xls" style="display:none" onchange="importExcel(event)">
-                <button class="btn btn-outline" onclick="changePassword()">🔑 修改密码</button>
+                <button class="btn btn-outline" onclick="changePassword()">🔑 改密</button>
                 <button class="btn btn-outline" onclick="lockScreen()">🔒 锁定</button>
             </div>
         </div>
@@ -118,7 +113,7 @@
         </div>
 
         <div class="toolbar">
-            <input type="text" id="searchInput" placeholder="🔍 搜索标题/供应商..." oninput="render()">
+            <input type="text" id="searchInput" placeholder="🔍 搜索..." oninput="render()">
             <div style="flex:1;"></div>
             <button class="btn btn-primary" onclick="openModal()">➕ 新建跟进</button>
         </div>
@@ -128,460 +123,256 @@
                 <thead>
                     <tr>
                         <th>任务标题</th>
-                        <th>供应商/客户</th>
+                        <th>供应商</th>
                         <th>类型</th>
-                        <th>订单编号</th>
-                        <th>下单日期</th>
-                        <th>跟进日期</th>
-                        <th>逾期后<br>跟进日期</th>
+                        <th>订单号</th>
+                        <th>下单日</th>
+                        <th>跟进日</th>
+                        <th>逾期后<br>跟进日</th>
                         <th>逾期<br>次数</th>
                         <th>状态</th>
                         <th>备注</th>
-                        <th style="min-width:100px;">操作</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody"></tbody>
             </table>
         </div>
-        <div style="margin-top: 6px; font-size: 11px; color: #94a3b8; text-align: right;">
-            💡 逾期后跟进日期：记录逾期后重新安排的日期，可追溯历史逾期情况
-        </div>
     </div>
 
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal">
-            <h2 id="modalTitle">📝 新建跟进</h2>
-            <div id="rescheduleHint" class="reschedule-hint" style="display:none;">⚠️ 该任务已逾期，请重新输入新的跟进日期</div>
-            <div id="rescheduleHistory" class="reschedule-history" style="display:none;">📋 逾期记录：已逾期 <strong id="historyOverdueCount">0</strong> 次，上次逾期后跟进日期：<strong id="historyLastReschedule">—</strong></div>
-            
-            <div class="form-group">
-                <label>任务标题 *</label>
-                <input type="text" id="formTitle">
-            </div>
-            <div class="form-group">
-                <label>供应商 / 客户名称 *</label>
-                <input type="text" id="formParty">
+            <h2 id="modalTitle">📝 跟进</h2>
+            <div id="rescheduleHint" class="reschedule-hint" style="display:none;">⚠️ 已逾期，请输入新跟进日期</div>
+            <div id="rescheduleHistory" class="reschedule-history" style="display:none;">逾期 <strong id="historyOverdueCount">0</strong> 次</div>
+            <div class="form-group"><label>标题 *</label><input type="text" id="formTitle"></div>
+            <div class="form-group"><label>供应商 *</label><input type="text" id="formParty"></div>
+            <div class="form-row">
+                <div class="form-group"><label>类型</label><select id="formType"><option>采购</option><option>发货</option></select></div>
+                <div class="form-group"><label>订单编号</label><input type="text" id="formOrderNo"></div>
             </div>
             <div class="form-row">
-                <div class="form-group">
-                    <label>类型</label>
-                    <select id="formType"><option value="采购">采购</option><option value="发货">发货</option></select>
-                </div>
-                <div class="form-group">
-                    <label>订单编号</label>
-                    <input type="text" id="formOrderNo">
-                </div>
+                <div class="form-group"><label>下单日</label><input type="date" id="formOrderDate"></div>
+                <div class="form-group"><label>跟进日</label><input type="date" id="formFollowDate"></div>
             </div>
-            <div class="form-row">
-                <div class="form-group">
-                    <label>下单日期</label>
-                    <input type="date" id="formOrderDate">
-                </div>
-                <div class="form-group">
-                    <label>跟进日期（预计）</label>
-                    <input type="date" id="formFollowDate">
-                </div>
-            </div>
-
             <div class="form-group" id="rescheduleDateGroup" style="display:none;">
-                <label>📅 新的跟进日期 *（逾期后重新输入）</label>
-                <input type="date" id="formRescheduleDate">
+                <label>📅 新跟进日</label><input type="date" id="formRescheduleDate">
             </div>
-
-            <div class="form-group">
-                <label>状态</label>
-                <select id="formStatus">
-                    <option value="pending">待跟进</option>
-                    <option value="progress">进行中</option>
-                    <option value="done">已完成</option>
-                </select>
+            <div class="form-group"><label>状态</label>
+                <select id="formStatus"><option value="pending">待跟进</option><option value="progress">进行中</option><option value="done">已完成</option></select>
             </div>
-            <div class="form-group">
-                <label>备注</label>
-                <textarea id="formNote" rows="3"></textarea>
-            </div>
-            <input type="hidden" id="formEditId">
-            <input type="hidden" id="formIsOverdue" value="false">
-            <input type="hidden" id="formRescheduleCount" value="0">
-            <input type="hidden" id="formLastRescheduleDate" value="">
+            <div class="form-group"><label>备注</label><textarea id="formNote" rows="3"></textarea></div>
+            <input type="hidden" id="formEditId"><input type="hidden" id="formRescheduleCount" value="0">
             <div class="btn-group">
                 <button class="btn btn-outline" onclick="closeModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveTask()">💾 保存</button>
             </div>
         </div>
     </div>
-
     <div class="toast" id="toast"></div>
 
     <script>
-        // ==================== 配置 ====================
-        const STORAGE_KEY = 'purchase_shipment_v4_track';
-        const JSONBIN_BIN_ID = '6a7ac386f5f4af5e2905cf90';
-        const JSONBIN_API_KEY = '$2a$10$c/Ws5/Q7Qhve2s0yX1tBheXQhPGIQ4fDhvNcm6hoOIqN7H.2txgu';
+        // ----- 专属配置 (使用您刚刚创建的独立 Access Key) -----
+        const STORAGE_KEY = 'my_purchase_tasks';
+        const BIN_ID = '6a7ac386f5f4af5e2905cf90';
+        const API_KEY = '$2a$10$AQ8tMSrEcWPdH0Axer/kvu5cXMYmBHulhQkMayNZZQRz9iwnqtdk2';
         
         let tasks = [];
-        let APP_PASSWORD = localStorage.getItem('my_crm_password') || 'admin123';
+        let APP_PASSWORD = localStorage.getItem('my_app_pwd') || 'admin123';
 
-        document.getElementById('unlockBtn').addEventListener('click', function() {
-            const input = document.getElementById('passwordInput');
-            if (input.value === APP_PASSWORD) {
+        // ----- 锁屏 -----
+        document.getElementById('unlockBtn').onclick = function() {
+            if (document.getElementById('passwordInput').value === APP_PASSWORD) {
                 document.getElementById('lockScreen').style.display = 'none';
                 document.getElementById('mainContent').classList.remove('hidden');
-                initApp();
-            } else {
-                alert('密码错误');
-                input.value = '';
-            }
-        });
-        document.getElementById('passwordInput').addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') document.getElementById('unlockBtn').click();
-        });
+                startApp();
+            } else alert('密码错误');
+        };
+        document.getElementById('passwordInput').addEventListener('keydown', e => { if(e.key === 'Enter') document.getElementById('unlockBtn').click(); });
 
         function lockScreen() {
             document.getElementById('lockScreen').style.display = 'flex';
             document.getElementById('mainContent').classList.add('hidden');
             document.getElementById('passwordInput').value = '';
-            document.getElementById('passwordInput').focus();
         }
-
         function changePassword() {
-            const newPwd = prompt("请输入新的登录密码 (留空取消)：");
-            if (newPwd && newPwd.trim().length > 0) {
-                APP_PASSWORD = newPwd.trim();
-                localStorage.setItem('my_crm_password', APP_PASSWORD);
-                showToast('✅ 密码已修改', 'success');
-            }
+            let p = prompt("新密码：");
+            if (p && p.trim()) { APP_PASSWORD = p.trim(); localStorage.setItem('my_app_pwd', APP_PASSWORD); showToast('密码已改'); }
         }
 
-        function loadTasks() {
-            const saved = localStorage.getItem(STORAGE_KEY);
-            if (saved) {
-                try {
-                    tasks = JSON.parse(saved);
-                    return true;
-                } catch (e) {}
-            }
-            return false;
-        }
-
-        function saveTasks(showToastMsg = true) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-            render();
-            syncToCloud(showToastMsg);
-        }
-
-        function setSyncStatus(text, type) {
-            const el = document.getElementById('syncStatus');
-            el.textContent = text;
-            el.className = 'sync-status ' + type;
-        }
-
-        async function syncToCloud(showToastMsg = true) {
-            setSyncStatus('⏳ 同步中...', 'loading');
+        // ----- 核心同步（强制读取云端） -----
+        async function getCloudData() {
             try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`, {
+                let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers: { 'X-Master-Key': API_KEY } });
+                if (res.ok) {
+                    let json = await res.json();
+                    if (json.record && Array.isArray(json.record)) return json.record;
+                }
+            } catch(e) {}
+            return null;
+        }
+
+        async function pushCloudData(data) {
+            try {
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': JSONBIN_API_KEY },
-                    body: JSON.stringify(tasks)
+                    headers: { 'Content-Type': 'application/json', 'X-Master-Key': API_KEY },
+                    body: JSON.stringify(data)
                 });
-                if (response.ok) {
-                    setSyncStatus('✅ 已同步', 'success');
-                    if(showToastMsg) showToast('✅ 数据已保存至云端', 'success');
-                } else {
-                    throw new Error('同步失败');
-                }
-            } catch (e) {
-                setSyncStatus('⚠️ 离线模式', 'error');
-                if(showToastMsg) showToast('⚠️ 数据已存本地，云端同步失败', 'error');
-            }
+                return true;
+            } catch(e) { return false; }
         }
 
-        async function loadFromCloud() {
-            setSyncStatus('📥 拉取云端数据...', 'loading');
-            try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`, {
-                    headers: { 'X-Master-Key': JSONBIN_API_KEY }
-                });
-                if (response.ok) {
-                    const result = await response.json();
-                    if (result.record && Array.isArray(result.record) && result.record.length > 0) {
-                        tasks = result.record;
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-                        render();
-                        setSyncStatus('✅ 已同步云端', 'success');
-                        showToast('✅ 已同步最新数据', 'success');
-                        return true;
-                    }
-                }
-                setSyncStatus('✅ 本地数据为主', 'success');
-                return false;
-            } catch (e) {
-                setSyncStatus('⚠️ 离线模式', 'error');
-                return false;
+        // ----- 启动流程 -----
+        async function startApp() {
+            let cloudTasks = await getCloudData();
+            if (cloudTasks && cloudTasks.length > 0) {
+                tasks = cloudTasks;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+                document.getElementById('syncStatus').innerText = "✅ 已同步云端";
+                document.getElementById('syncStatus').className = "sync-status success";
+            } else {
+                let local = localStorage.getItem(STORAGE_KEY);
+                if (local) tasks = JSON.parse(local);
+                document.getElementById('syncStatus').innerText = "⚠️ 本地数据";
+                document.getElementById('syncStatus').className = "sync-status error";
             }
+            render();
         }
 
+        // ----- 保存数据（覆盖云端） -----
+        function saveTasks() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+            pushCloudData(tasks);
+            render();
+            showToast('已保存');
+        }
+
+        // ----- 工具函数 -----
         function getToday() { return new Date().toISOString().split('T')[0]; }
-        function formatDate(dateStr) { if (!dateStr) return '—'; return new Date(dateStr).toLocaleDateString('zh-CN'); }
-        function calcOverdue(followDate) {
-            if (!followDate) return 0;
-            const today = getToday();
-            if (followDate < today) {
-                return Math.floor((new Date(today) - new Date(followDate)) / (1000 * 60 * 60 * 24));
-            }
-            return 0;
-        }
-        function generateId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 6); }
+        function formatDate(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '—'; }
+        function genId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 6); }
+        function calcOverdue(f) { if (!f) return 0; let t = getToday(); return f < t ? Math.floor((new Date(t) - new Date(f)) / (86400000)) : 0; }
 
         function render() {
-            const today = getToday();
-            const keyword = document.getElementById('searchInput').value.toLowerCase();
-
-            tasks.forEach(t => {
-                if (t.status !== 'done' && t.followDate && t.followDate < today) {
-                    t.status = 'overdue';
-                }
-            });
-
-            let filtered = tasks.filter(t => 
-                t.title.toLowerCase().includes(keyword) || 
-                (t.party || '').toLowerCase().includes(keyword)
-            );
+            const t = getToday();
+            tasks.forEach(x => { if (x.status !== 'done' && x.followDate && x.followDate < t) x.status = 'overdue'; });
             
-            const statusOrder = { overdue: 0, pending: 1, progress: 2, done: 3 };
-            filtered.sort((a, b) => (statusOrder[a.status] || 99) - (statusOrder[b.status] || 99));
-
-            const tbody = document.getElementById('tableBody');
-            if (filtered.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="11"><div style="text-align:center;padding:30px;color:#94a3b8;">暂无任务，点击「新建跟进」开始</div></td></tr>`;
-            } else {
-                tbody.innerHTML = filtered.map(t => {
-                    const overdueDays = calcOverdue(t.followDate);
-                    const isOverdue = t.status === 'overdue';
-                    const hasReschedule = (t.rescheduleCount || 0) > 0;
-
-                    const statusMap = {
-                        pending: '<span class="status-badge status-pending">⏳ 待跟进</span>',
-                        progress: '<span class="status-badge status-progress">🔄 进行中</span>',
-                        done: '<span class="status-badge status-done">✅ 已完成</span>',
-                        overdue: `<span class="status-badge status-overdue">⚠️ 逾期 ${overdueDays}天</span>`
-                    };
-                    const typeMap = { '采购': '🛒 采购', '发货': '🚚 发货' };
-
-                    return `
-                        <tr class="${isOverdue ? 'overdue-row' : ''}">
-                            <td><strong>${t.title}</strong></td>
-                            <td><strong>${t.party || '—'}</strong></td>
-                            <td>${typeMap[t.type] || t.type}</td>
-                            <td>${t.orderNo || '—'}</td>
-                            <td>${formatDate(t.orderDate)}</td>
-                            <td>${formatDate(t.followDate)}${isOverdue ? ' ⚠️' : ''}</td>
-                            <td>${t.rescheduleDate ? formatDate(t.rescheduleDate) : '—'}</td>
-                            <td>${hasReschedule ? `<span class="rescheduled-badge">🔄 ${t.rescheduleCount}次</span>` : '—'}</td>
-                            <td>${statusMap[t.status] || t.status}</td>
-                            <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${t.note || ''}">${t.note || '—'}</td>
-                            <td>
-                                <div class="action-btns">
-                                    <button onclick="editTask('${t.id}')" title="编辑">✏️</button>
-                                    ${isOverdue ? `<button onclick="editTask('${t.id}')" title="重新安排" style="color:#f59e0b;">📅</button>` : ''}
-                                    <button onclick="deleteTask('${t.id}')" title="删除" style="color:#dc2626;">🗑️</button>
-                                </div>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-            }
-
-            document.getElementById('statTotal').textContent = tasks.length;
-            document.getElementById('statPending').textContent = tasks.filter(t => t.status === 'pending').length;
-            document.getElementById('statProgress').textContent = tasks.filter(t => t.status === 'progress').length;
-            document.getElementById('statOverdue').textContent = tasks.filter(t => t.status === 'overdue').length;
-            document.getElementById('statRescheduled').textContent = tasks.filter(t => (t.rescheduleCount || 0) > 0).length;
-            document.getElementById('statDone').textContent = tasks.filter(t => t.status === 'done').length;
+            let html = tasks.map(x => {
+                let over = calcOverdue(x.followDate);
+                let isOver = x.status === 'overdue';
+                let statusMap = { pending:'⏳ 待跟进', progress:'🔄 进行中', done:'✅ 已完成', overdue:`⚠️ 逾期 ${over}天` };
+                return `<tr class="${isOver?'overdue-row':''}">
+                    <td><strong>${x.title}</strong></td><td>${x.party||'—'}</td><td>${x.type||'采购'}</td>
+                    <td>${x.orderNo||'—'}</td><td>${formatDate(x.orderDate)}</td>
+                    <td>${formatDate(x.followDate)}${isOver?' ⚠️':''}</td>
+                    <td>${x.rescheduleDate?formatDate(x.rescheduleDate):'—'}</td>
+                    <td>${(x.rescheduleCount||0)>0 ? `🔄 ${x.rescheduleCount}次` : '—'}</td>
+                    <td><span class="status-badge status-${x.status}">${statusMap[x.status]}</span></td>
+                    <td style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${x.note||'—'}</td>
+                    <td>
+                        <button onclick="editTask('${x.id}')">✏️</button>
+                        ${isOver ? `<button onclick="editTask('${x.id}')" style="color:#f59e0b;">📅</button>` : ''}
+                        <button onclick="deleteTask('${x.id}')" style="color:#dc2626;">🗑️</button>
+                    </td>
+                </tr>`;
+            }).join('');
+            document.getElementById('tableBody').innerHTML = html || '<tr><td colspan="11" style="padding:30px;text-align:center;">暂无数据</td></tr>';
+            document.getElementById('statTotal').innerText = tasks.length;
+            document.getElementById('statPending').innerText = tasks.filter(x=>x.status==='pending').length;
+            document.getElementById('statOverdue').innerText = tasks.filter(x=>x.status==='overdue').length;
+            document.getElementById('statDone').innerText = tasks.filter(x=>x.status==='done').length;
+            document.getElementById('statRescheduled').innerText = tasks.filter(x=>(x.rescheduleCount||0)>0).length;
         }
 
         function openModal(data) {
-            const overlay = document.getElementById('modalOverlay');
-            const title = document.getElementById('modalTitle');
-            const isOverdue = data && data.status === 'overdue';
-            const hasHistory = data && (data.rescheduleCount || 0) > 0;
-
-            document.getElementById('rescheduleHint').style.display = isOverdue ? 'block' : 'none';
-            document.getElementById('rescheduleDateGroup').style.display = isOverdue ? 'block' : 'none';
-
-            const historyDiv = document.getElementById('rescheduleHistory');
-            if (hasHistory) {
-                historyDiv.style.display = 'block';
-                document.getElementById('historyOverdueCount').textContent = data.rescheduleCount;
-                document.getElementById('historyLastReschedule').textContent = data.lastRescheduleDate ? formatDate(data.lastRescheduleDate) : '—';
-            } else {
-                historyDiv.style.display = 'none';
-            }
-
-            document.getElementById('formIsOverdue').value = isOverdue ? 'true' : 'false';
-
-            if (data) {
-                title.textContent = isOverdue ? '⚠️ 逾期任务 - 重新安排' : '✏️ 编辑任务';
-                document.getElementById('formTitle').value = data.title || '';
-                document.getElementById('formParty').value = data.party || '';
-                document.getElementById('formType').value = data.type || '采购';
-                document.getElementById('formOrderNo').value = data.orderNo || '';
-                document.getElementById('formOrderDate').value = data.orderDate || '';
-                document.getElementById('formFollowDate').value = data.followDate || '';
-                document.getElementById('formRescheduleDate').value = isOverdue ? getToday() : '';
-                document.getElementById('formStatus').value = isOverdue ? 'pending' : (data.status || 'pending');
-                document.getElementById('formNote').value = data.note || '';
-                document.getElementById('formRescheduleCount').value = data.rescheduleCount || 0;
-                document.getElementById('formLastRescheduleDate').value = data.lastRescheduleDate || '';
-                document.getElementById('formEditId').value = data.id || '';
-            } else {
-                title.textContent = '📝 新建跟进';
-                document.getElementById('formTitle').value = '';
-                document.getElementById('formParty').value = '';
-                document.getElementById('formType').value = '采购';
-                document.getElementById('formOrderNo').value = '';
-                document.getElementById('formOrderDate').value = getToday();
-                document.getElementById('formFollowDate').value = '';
-                document.getElementById('formRescheduleDate').value = '';
-                document.getElementById('formStatus').value = 'pending';
-                document.getElementById('formNote').value = '';
-                document.getElementById('formRescheduleCount').value = '0';
-                document.getElementById('formLastRescheduleDate').value = '';
-                document.getElementById('formEditId').value = '';
-                document.getElementById('rescheduleHint').style.display = 'none';
-                document.getElementById('rescheduleDateGroup').style.display = 'none';
-                document.getElementById('rescheduleHistory').style.display = 'none';
-                document.getElementById('formIsOverdue').value = 'false';
-            }
-            overlay.classList.add('active');
+            let isOver = data && data.status === 'overdue';
+            document.getElementById('modalOverlay').classList.add('active');
+            document.getElementById('modalTitle').innerText = isOver ? '⚠️ 重新安排' : (data ? '✏️ 编辑' : '📝 新建');
+            document.getElementById('rescheduleHint').style.display = isOver ? 'block' : 'none';
+            document.getElementById('rescheduleDateGroup').style.display = isOver ? 'block' : 'none';
+            document.getElementById('formTitle').value = data ? data.title : '';
+            document.getElementById('formParty').value = data ? data.party : '';
+            document.getElementById('formType').value = data ? data.type : '采购';
+            document.getElementById('formOrderNo').value = data ? data.orderNo : '';
+            document.getElementById('formOrderDate').value = data ? data.orderDate : getToday();
+            document.getElementById('formFollowDate').value = data ? data.followDate : '';
+            document.getElementById('formRescheduleDate').value = isOver ? getToday() : '';
+            document.getElementById('formStatus').value = data ? (isOver ? 'pending' : data.status) : 'pending';
+            document.getElementById('formNote').value = data ? data.note : '';
+            document.getElementById('formEditId').value = data ? data.id : '';
+            document.getElementById('formRescheduleCount').value = data ? data.rescheduleCount || 0 : 0;
         }
-
         function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
 
+        // ----- 核心更新：保存成功，弹窗自动关闭 -----
         function saveTask() {
-            const title = document.getElementById('formTitle').value.trim();
-            const party = document.getElementById('formParty').value.trim();
-            if (!title || !party) { showToast('请填写任务标题和供应商', 'error'); return; }
+            let title = document.getElementById('formTitle').value.trim();
+            let party = document.getElementById('formParty').value.trim();
+            if (!title || !party) { showToast('请填写标题和供应商', 'error'); return; }
 
-            const editId = document.getElementById('formEditId').value;
-            const isOverdue = document.getElementById('formIsOverdue').value === 'true';
+            let id = document.getElementById('formEditId').value;
+            let isOver = document.getElementById('formFollowDate').value < getToday() && document.getElementById('formStatus').value !== 'done';
 
-            let followDate = document.getElementById('formFollowDate').value;
-            let status = document.getElementById('formStatus').value;
-            let rescheduleCount = parseInt(document.getElementById('formRescheduleCount').value) || 0;
-            let lastRescheduleDate = document.getElementById('formLastRescheduleDate').value || '';
-            let rescheduleDate = '';
-
-            if (isOverdue) {
-                const newDate = document.getElementById('formRescheduleDate').value;
-                if (!newDate) { showToast('请填写新的跟进日期', 'error'); return; }
-                followDate = newDate;
-                status = 'pending';
-                rescheduleDate = newDate;
-                rescheduleCount += 1;
-                lastRescheduleDate = newDate;
-            }
-
-            const data = {
-                title, party,
-                type: document.getElementById('formType').value,
+            let data = {
+                title, party, type: document.getElementById('formType').value,
                 orderNo: document.getElementById('formOrderNo').value.trim(),
                 orderDate: document.getElementById('formOrderDate').value,
-                followDate: followDate,
-                status: status,
-                note: document.getElementById('formNote').value.trim(),
-                rescheduleDate: rescheduleDate,
-                rescheduleCount: rescheduleCount,
-                lastRescheduleDate: lastRescheduleDate,
+                followDate: document.getElementById('formFollowDate').value,
+                status: document.getElementById('formStatus').value,
+                note: document.getElementById('formNote').value.trim()
             };
 
-            if (editId) {
-                const idx = tasks.findIndex(t => t.id === editId);
-                if (idx !== -1) {
-                    const old = tasks[idx];
-                    tasks[idx] = {
-                        ...old,
-                        ...data,
-                        rescheduleCount: isOverdue ? rescheduleCount : old.rescheduleCount,
-                        lastRescheduleDate: isOverdue ? lastRescheduleDate : old.lastRescheduleDate,
-                        rescheduleDate: isOverdue ? rescheduleDate : old.rescheduleDate,
-                    };
-                    if (!isOverdue) showToast('✅ 任务已更新');
-                }
+            if (id) {
+                let idx = tasks.findIndex(x => x.id === id);
+                if (idx !== -1) tasks[idx] = { ...tasks[idx], ...data };
             } else {
-                data.id = generateId();
+                data.id = genId();
                 tasks.push(data);
-                showToast('✅ 任务已创建');
             }
 
-            saveTasks();
-            closeModal();
-            render();
+            // 专门处理逾期重新安排
+            if (isOver) {
+                let newDate = document.getElementById('formRescheduleDate').value;
+                if (!newDate) { showToast('请选择新日期', 'error'); return; }
+                let idx = tasks.findIndex(x => x.id === (id || data.id));
+                if (idx !== -1) {
+                    tasks[idx].rescheduleDate = newDate;
+                    tasks[idx].rescheduleCount = (tasks[idx].rescheduleCount || 0) + 1;
+                    tasks[idx].followDate = newDate;
+                    tasks[idx].status = 'pending';
+                }
+            }
+
+            saveTasks();  // 保存数据（含同步云端）
+            closeModal(); // ✅ 改在这里！保存后立即关闭弹窗
         }
 
-        function editTask(id) {
-            const task = tasks.find(t => t.id === id);
-            if (task) openModal(task);
-        }
-
-        function deleteTask(id) {
-            if (!confirm('确定要删除这个任务吗？')) return;
-            tasks = tasks.filter(t => t.id !== id);
-            saveTasks();
-            render();
-            showToast('🗑️ 已删除');
-        }
+        function editTask(id) { let t = tasks.find(x=>x.id===id); if(t) openModal(t); }
+        function deleteTask(id) { if(confirm('删除？')) { tasks = tasks.filter(x=>x.id!==id); saveTasks(); } }
 
         function exportExcel() {
-            if (tasks.length === 0) { showToast('没有数据可导出', 'error'); return; }
-            const wb = XLSX.utils.book_new();
-            const ws = XLSX.utils.json_to_sheet(tasks);
-            XLSX.utils.book_append_sheet(wb, ws, "跟单数据");
+            if (!tasks.length) { showToast('无数据', 'error'); return; }
+            let wb = XLSX.utils.book_new();
+            let ws = XLSX.utils.json_to_sheet(tasks);
+            XLSX.utils.book_append_sheet(wb, ws, "跟单");
             XLSX.writeFile(wb, `跟单数据_${getToday()}.xlsx`);
-            showToast('📥 导出成功');
+            showToast('导出成功');
         }
-
-        function importExcel(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const data = new Uint8Array(e.target.result);
-                const workbook = XLSX.read(data, {type: 'array'});
-                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
-                if (jsonData.length > 0) {
-                    jsonData.forEach(item => { if(!item.id) item.id = generateId(); });
-                    tasks = tasks.concat(jsonData);
-                    saveTasks();
-                    showToast(`✅ 成功导入 ${jsonData.length} 条数据`);
-                } else {
-                    showToast('表格为空或格式不对', 'error');
-                }
+        function importExcel(e) {
+            let f = e.target.files[0]; if(!f) return;
+            let r = new FileReader();
+            r.onload = function(ev) {
+                let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
+                let d = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                if(d.length) { d.forEach(x=>{ if(!x.id) x.id=genId(); }); tasks = tasks.concat(d); saveTasks(); showToast(`导入 ${d.length} 条`); }
             };
-            reader.readAsArrayBuffer(file);
-            event.target.value = '';
+            r.readAsArrayBuffer(f); e.target.value='';
         }
-
-        function showToast(msg, type = 'success') {
-            const el = document.getElementById('toast');
-            el.textContent = msg;
-            el.className = 'toast ' + type;
-            el.classList.add('show');
-            clearTimeout(el._timer);
-            el._timer = setTimeout(() => el.classList.remove('show'), 3000);
-        }
-
-        // ==================== 修正后的初始化 ====================
-        async function initApp() {
-            // 1. 先尝试强制从云端拉取最新数据
-            const cloudFetched = await loadFromCloud();
-            
-            // 2. 如果云端拉取失败（比如断网），就用本地浏览器缓存的数据
-            if (!cloudFetched) {
-                loadTasks();
-                render();
-            }
+        function showToast(msg, type='success') {
+            let el = document.getElementById('toast');
+            el.innerText = msg; el.className = `toast ${type}`; el.classList.add('show');
+            clearTimeout(el._timer); el._timer = setTimeout(()=>el.classList.remove('show'), 2500);
         }
     </script>
 </body>
