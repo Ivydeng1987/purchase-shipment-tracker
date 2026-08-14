@@ -75,10 +75,15 @@
         .modal h2 { font-size: 16px; margin-bottom: 14px; }
         .mini-list { border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 14px; max-height: 240px; overflow-y: auto; }
         .mini-list-item { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .mini-list-item.clickable { cursor: pointer; }
+        .mini-list-item.clickable:hover { background: #f8fafc; }
         .mini-list-item:last-child { border-bottom: none; }
         .mini-list-item .info { flex: 1; }
         .mini-list-item .info b { display: block; }
         .mini-list-item .info span { color: #94a3b8; font-size: 11px; }
+        .import-item-row { padding: 6px 10px; border-bottom: 1px solid #f1f5f9; display: flex; align-items: center; gap: 8px; font-size: 12px; }
+        .import-item-row input[type="checkbox"] { width: auto; }
+        .badge-used { background: #e2e8f0; color: #64748b; display: inline-block; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 500; }
 
         .toast { position: fixed; bottom: 20px; right: 20px; background: #0e4b6e; color: white; padding: 10px 20px; border-radius: 50px; font-size: 13px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 2000; opacity: 0; transform: translateY(20px); transition: all 0.3s ease; }
         .toast.show { opacity: 1; transform: translateY(0); }
@@ -202,6 +207,7 @@
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <button class="btn btn-primary" id="saveOrderBtn" onclick="saveOrder()">💾 保存订单</button>
                     <button class="btn btn-outline" onclick="exportOrderContract()">📥 导出订购合同</button>
+                    <button class="btn btn-outline" onclick="openImportModal()">📥 从客户订单导入货品</button>
                     <button class="btn btn-outline" id="copyOrderBtn" onclick="copyCurrentOrder()" style="display:none;">📋 复制为新订单</button>
                     <button class="btn btn-outline" onclick="backToList()">← 返回列表</button>
                     <button class="btn btn-danger" id="deleteOrderBtn" onclick="deleteCurrentOrder()" style="display:none;">🗑️ 删除订单</button>
@@ -264,12 +270,33 @@
         </div>
     </div>
 
+    <!-- ========== 从客户订单导入货品弹窗 ========== -->
+    <div class="modal-overlay" id="importModal">
+        <div class="modal" style="max-width:700px;">
+            <h2>📥 从客户订单导入货品</h2>
+            <div id="importOrderListView">
+                <div class="mini-list" id="importOrderList"><div class="mini-list-item">加载中...</div></div>
+            </div>
+            <div id="importItemsView" class="hidden">
+                <button class="btn btn-outline btn-sm" onclick="backToImportOrderList()" style="margin-bottom:10px;">← 返回订单列表</button>
+                <div id="importItemsList"></div>
+                <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
+                    <button class="btn btn-primary" onclick="confirmImportItems()">✅ 导入选中的货品</button>
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:10px;">
+                <button class="btn btn-outline" onclick="closeModal('importModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
         // ====== 配置信息 ======
         const STORAGE_KEY = 'procurement_orders_v2';
         const BIN_ID = '6a7af37ef5f4af5e29068975';  // 沿用原有采购跟单系统的Bin
+        const CUSTOMER_ORDER_BIN_ID = '6a7e7e1bda38895dfee28007';  // 客户下单系统Bin（只读，用于导入）
         const WORKER_URL = 'https://sunlit-proxy.ivy-3fc.workers.dev';
         const ACCESS_TOKEN = 'RBhCP4O1yvwxN7nB9oMoQCzuj2ZnF3M9daOE76fRVtk';
 
@@ -283,6 +310,9 @@
 
         let orders = [];
         let suppliers = [];
+        let usedCustomerOrderItems = []; // 已经从客户订单勾选导入过的货品记录 [{customerOrderNo, name, size, usedAt}]，仅提示不强制拦截
+        let importCache = null;
+        let importSelectedOrder = null;
         let APP_PASSWORD = localStorage.getItem('my_app_pwd') || 'admin123';
         let currentOrderNo = null;
 
@@ -322,11 +352,12 @@
                         return {
                             password: r.password || null,
                             orders: Array.isArray(r.orders) ? r.orders : [],
-                            suppliers: Array.isArray(r.suppliers) ? r.suppliers : []
+                            suppliers: Array.isArray(r.suppliers) ? r.suppliers : [],
+                            usedCustomerOrderItems: Array.isArray(r.usedCustomerOrderItems) ? r.usedCustomerOrderItems : []
                         };
                     }
                     // 兼容旧格式（v1的任务数组）：识别到旧格式后直接视为空的新结构，旧数据不做迁移
-                    return { password: null, orders: [], suppliers: [] };
+                    return { password: null, orders: [], suppliers: [], usedCustomerOrderItems: [] };
                 } else {
                     console.log(`拉取失败，状态码: ${res.status}`);
                 }
@@ -336,7 +367,7 @@
 
         async function pushCloudData() {
             try {
-                let payload = { password: APP_PASSWORD, orders, suppliers };
+                let payload = { password: APP_PASSWORD, orders, suppliers, usedCustomerOrderItems };
                 let res = await fetch(`${WORKER_URL}/bin/${BIN_ID}`, {
                     method: 'PUT',
                     headers: { 'Content-Type': 'application/json', 'X-Access-Token': ACCESS_TOKEN },
@@ -348,12 +379,26 @@
             } catch(e) { console.error("上传错误:", e); return false; }
         }
 
+        // ====== 只读拉取客户下单系统数据（用于导入货品）======
+        async function fetchCustomerOrders() {
+            try {
+                let res = await fetch(`${WORKER_URL}/bin/${CUSTOMER_ORDER_BIN_ID}/latest`, { headers: { 'X-Access-Token': ACCESS_TOKEN } });
+                if (res.ok) {
+                    let json = await res.json();
+                    let r = json.record;
+                    if (r && typeof r === 'object' && Array.isArray(r.orders)) return r.orders;
+                }
+            } catch(e) { console.error('拉取客户订单失败:', e); }
+            return [];
+        }
+
         async function preloadCloud() {
             let cloud = await getCloudData();
             if (cloud) {
                 orders = cloud.orders;
                 suppliers = cloud.suppliers;
-                localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers }));
+                usedCustomerOrderItems = cloud.usedCustomerOrderItems;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers, usedCustomerOrderItems }));
                 if (cloud.password) {
                     APP_PASSWORD = cloud.password;
                     localStorage.setItem('my_app_pwd', APP_PASSWORD);
@@ -364,7 +409,7 @@
                 let local = localStorage.getItem(STORAGE_KEY);
                 if (local) {
                     let d = JSON.parse(local);
-                    orders = d.orders || []; suppliers = d.suppliers || [];
+                    orders = d.orders || []; suppliers = d.suppliers || []; usedCustomerOrderItems = d.usedCustomerOrderItems || [];
                     document.getElementById('syncStatus').innerText = "⚠️ 本地数据(云端无数据)";
                 } else {
                     document.getElementById('syncStatus').innerText = "📂 空系统";
@@ -378,12 +423,12 @@
         preloadCloud();
 
         function saveAll() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers }));
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers, usedCustomerOrderItems }));
             pushCloudData();
         }
 
         function backupAllData() {
-            let payload = { exportedAt: new Date().toISOString(), orders, suppliers };
+            let payload = { exportedAt: new Date().toISOString(), orders, suppliers, usedCustomerOrderItems };
             let blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
             let url = URL.createObjectURL(blob);
             let a = document.createElement('a');
@@ -506,6 +551,17 @@
                 if (name || size || qty) items.push({ name, size, price, qty, amount });
             });
             return items;
+        }
+        function appendItems(items) {
+            if (!items || !items.length) return;
+            let body = document.getElementById('itemsTableBody');
+            let rows = body.querySelectorAll('tr');
+            if (rows.length === 1) {
+                let r = rows[0];
+                let allEmpty = ['item-name','item-size','item-qty'].every(cls => !r.querySelector('.' + cls).value.trim());
+                if (allEmpty) r.remove();
+            }
+            items.forEach(it => addItemRow(it));
         }
 
         // ====== 订单号生成 ======
@@ -778,6 +834,105 @@
             `).join('');
             document.getElementById('priceHistoryBody').innerHTML = html || '<tr><td colspan="6" style="padding:20px;text-align:center;">没有找到匹配的历史记录</td></tr>';
         }
+
+        // ====== 从客户订单导入货品（按"品名+尺寸"精确追踪是否勾选过，软提示不强制拦截）======
+        function itemUsageKey(customerOrderNo, name, size) {
+            return `${customerOrderNo}::${name}::${size}`;
+        }
+
+        async function openImportModal() {
+            document.getElementById('importModal').classList.add('active');
+            document.getElementById('importOrderListView').classList.remove('hidden');
+            document.getElementById('importItemsView').classList.add('hidden');
+
+            let listEl = document.getElementById('importOrderList');
+            listEl.innerHTML = '<div class="mini-list-item">正在加载客户订单列表...</div>';
+
+            if (!importCache) {
+                importCache = await fetchCustomerOrders();
+            }
+            let list = (importCache || []).filter(o => !o.deleted);
+            list.sort((a, b) => (b.orderNo || '').localeCompare(a.orderNo || ''));
+
+            if (list.length === 0) {
+                listEl.innerHTML = '<div class="mini-list-item">没有找到客户订单数据</div>';
+                return;
+            }
+
+            listEl.innerHTML = list.map(o => {
+                let itemCount = (o.items || []).length;
+                return `<div class="mini-list-item clickable" onclick='selectImportOrder(${JSON.stringify(o.orderNo)})'>
+                    <div class="info"><b>${escapeHtml(o.orderNo)}　${escapeHtml(o.customerShort || o.customerCompany || '')}</b><span>${formatDate(o.orderDate)} ｜ ${itemCount}条货品</span></div>
+                    <span>→</span>
+                </div>`;
+            }).join('');
+        }
+
+        function selectImportOrder(orderNo) {
+            let order = (importCache || []).find(o => o.orderNo === orderNo);
+            if (!order) return;
+            importSelectedOrder = order;
+
+            document.getElementById('importOrderListView').classList.add('hidden');
+            document.getElementById('importItemsView').classList.remove('hidden');
+
+            let items = order.items || [];
+            let html = items.map((it, i) => {
+                let usedRecord = usedCustomerOrderItems.find(u => u.customerOrderNo === orderNo && u.name === it.name && u.size === it.size);
+                let usedBadge = usedRecord ? `<span class="badge-used">已勾选 ${formatDate(usedRecord.usedAt)}</span>` : '';
+                return `<div class="import-item-row">
+                    <input type="checkbox" class="import-check" data-idx="${i}" checked>
+                    <span style="flex:1;">${escapeHtml(it.name)}　${escapeHtml(it.size)}　数量:${escapeHtml(it.qty)}</span>
+                    ${usedBadge}
+                </div>`;
+            }).join('');
+            document.getElementById('importItemsList').innerHTML = html || '<div class="import-item-row">该订单没有货品明细</div>';
+            document.getElementById('importItemsList').dataset.sourceLabel = `客户订单${orderNo}`;
+        }
+
+        function backToImportOrderList() {
+            document.getElementById('importOrderListView').classList.remove('hidden');
+            document.getElementById('importItemsView').classList.add('hidden');
+        }
+
+        function confirmImportItems() {
+            if (!importSelectedOrder) return;
+            let checks = document.querySelectorAll('.import-check:checked');
+            let items = importSelectedOrder.items || [];
+            let sourceLabel = document.getElementById('importItemsList').dataset.sourceLabel || '';
+            let orderNo = importSelectedOrder.orderNo;
+
+            let toImport = [];
+            let repeats = [];
+            checks.forEach(c => {
+                let idx = parseInt(c.dataset.idx);
+                let it = items[idx];
+                if (!it) return;
+                // 只带品名/尺寸/数量，不带客户订单里的单价（那是卖给客户的价格，不是采购价）
+                toImport.push({ name: it.name || '', size: it.size || '', qty: it.qty || '', price: '', amount: '' });
+                let usedRecord = usedCustomerOrderItems.find(u => u.customerOrderNo === orderNo && u.name === it.name && u.size === it.size);
+                if (usedRecord) repeats.push(`${it.name} ${it.size}`);
+            });
+            if (toImport.length === 0) { showToast('请至少选择一条货品', 'error'); return; }
+
+            if (repeats.length > 0) {
+                let ok = confirm(`勾选的货品里有 ${repeats.length} 项（${repeats.join('、')}）之前已经勾选导入过，确定要再次导入吗？`);
+                if (!ok) return;
+            }
+
+            appendItems(toImport);
+
+            // 记录本次勾选过的品名+尺寸（仅作提示用，不再强制拦截重复选择）
+            let today = getToday();
+            toImport.forEach(it => {
+                usedCustomerOrderItems.push({ customerOrderNo: orderNo, name: it.name, size: it.size, usedAt: today });
+            });
+            saveAll();
+
+            closeModal('importModal');
+            showToast(`已导入 ${toImport.length} 条货品`);
+        }
+
 
         // ====== 导出订购合同（Excel固定排版，方便另存为PDF）======
         function exportOrderContract() {
