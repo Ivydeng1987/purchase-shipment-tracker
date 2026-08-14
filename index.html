@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>采购 · 发货跟单系统 v4.6 (终极强校验版)</title>
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+    <meta name="robots" content="noindex, nofollow, noarchive">
+    <title>采购跟单系统 v2.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style/dist/xlsx.bundle.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; padding: 16px; color: #1e293b; }
@@ -14,76 +15,86 @@
         .lock-screen .lock-box h2 { font-size: 22px; color: #0e4b6e; margin-bottom: 6px; }
         .lock-screen .lock-box input { width: 100%; padding: 12px 16px; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 16px; outline: none; text-align: center; }
         .lock-screen .lock-box button { margin-top: 14px; width: 100%; padding: 12px; background: #0e4b6e; color: white; border: none; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; }
-        
+        .lock-screen .lock-box button:disabled { background: #94a3b8; cursor: not-allowed; }
+
         .header { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; background: white; padding: 12px 18px; border-radius: 14px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
         .header h1 { font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
         .header h1 span { background: #0e4b6e; color: white; font-size: 12px; padding: 2px 10px; border-radius: 30px; font-weight: 400; }
         .header-right { display: flex; align-items: center; gap: 10px; font-size: 13px; flex-wrap: wrap; }
-        .header-right .sync-status { font-weight: 500; font-size: 12px; padding: 4px 12px; border-radius: 20px; }
+        .sync-status { font-weight: 500; font-size: 12px; padding: 4px 12px; border-radius: 20px; }
         .sync-status.success { background: #dcfce7; color: #16a34a; }
         .sync-status.error { background: #fee2e2; color: #dc2626; }
-        .sync-status.loading { background: #fef3c7; color: #d97706; }
-        
+
         .btn { padding: 6px 14px; border: none; border-radius: 30px; font-size: 12px; font-weight: 500; cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; gap: 4px; }
         .btn-primary { background: #0e4b6e; color: white; }
         .btn-primary:hover { background: #0a3a55; }
         .btn-outline { background: white; border: 1px solid #e2e8f0; color: #475569; }
         .btn-outline:hover { background: #f1f5f9; }
+        .btn-danger { background: #fee2e2; color: #dc2626; }
+        .btn-sm { padding: 4px 10px; font-size: 11px; }
 
-        .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); gap: 8px; margin-bottom: 16px; }
-        .stat-card { background: white; padding: 10px 12px; border-radius: 10px; text-align: center; }
-        .stat-card .number { font-size: 20px; font-weight: 700; color: #0e4b6e; }
-        .stat-card .label { font-size: 11px; color: #64748b; }
-        .stat-card.overdue .number { color: #dc2626; }
-        .stat-card.done .number { color: #16a34a; }
-        .stat-card.rescheduled .number { color: #f59e0b; }
+        .card { background: white; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
+        .card h2 { font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
+
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: inherit; }
+        .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: #0e4b6e; outline: none; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+        .checkbox-row input { width: auto; }
+        .reschedule-hint { background: #fef3c7; padding: 10px 14px; border-radius: 8px; font-size: 12px; color: #92400e; margin-bottom: 12px; }
+
+        .items-table { width: 100%; border-collapse: collapse; margin-bottom: 6px; font-size: 12px; }
+        .items-table th { background: #f8fafc; padding: 6px 8px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
+        .items-table td { padding: 4px; border-bottom: 1px solid #f1f5f9; }
+        .items-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
+        .items-table .del-row { color: #dc2626; cursor: pointer; background: none; border: none; font-size: 14px; }
+        .items-total { text-align: right; font-size: 13px; font-weight: 600; color: #0e4b6e; margin-bottom: 12px; padding: 8px 12px; background: #f0f9ff; border-radius: 8px; }
+
+        .table-wrapper { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); overflow-x: auto; }
+        table.list-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 950px; }
+        table.list-table th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
+        table.list-table td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+        table.list-table tr:hover td { background: #fafbfc; }
+        .order-link { color: #0e4b6e; font-weight: 600; cursor: pointer; text-decoration: underline; }
+        .overdue-row td { background: #fef2f2; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 500; }
+        .badge-yes { background: #dcfce7; color: #16a34a; }
+        .badge-no { background: #fef3c7; color: #d97706; }
+        .badge-overdue { background: #fee2e2; color: #dc2626; }
+        .badge-reschedule { background: #fef3c7; color: #92400e; }
 
         .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
-        .toolbar input[type="text"] { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 30px; font-size: 12px; outline: none; width: 180px; }
-        .table-wrapper { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 1000px; }
-        th { background: #f8fafc; padding: 8px 10px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
-        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; }
-        tr:hover td { background: #fafbfc; }
-        .overdue-row td { background: #fef2f2; border-left: 3px solid #dc2626; }
-
-        .status-badge { display: inline-block; padding: 2px 10px; border-radius: 30px; font-size: 11px; font-weight: 500; }
-        .status-pending { background: #fef3c7; color: #d97706; }
-        .status-progress { background: #dbeafe; color: #2563eb; }
-        .status-done { background: #dcfce7; color: #16a34a; }
-        .status-overdue { background: #fee2e2; color: #dc2626; }
-        .rescheduled-badge { background: #fef3c7; color: #92400e; padding: 1px 8px; border-radius: 30px; font-size: 10px; font-weight: 500; }
+        .toolbar input[type="text"] { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 30px; font-size: 12px; outline: none; width: 200px; }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4); backdrop-filter: blur(4px); display: none; align-items: center; justify-content: center; z-index: 1000; padding: 16px; }
         .modal-overlay.active { display: flex; }
-        .modal { background: white; border-radius: 16px; padding: 20px 24px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }
-        .modal h2 { font-size: 18px; margin-bottom: 16px; }
-        .modal .form-group { margin-bottom: 12px; }
-        .modal .form-group label { display: block; font-size: 12px; font-weight: 500; color: #475569; margin-bottom: 3px; }
-        .modal .form-group input, .modal .form-group select, .modal .form-group textarea { width: 100%; padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 13px; font-family: inherit; }
-        .modal .form-group input:focus, .modal .form-group select:focus, .modal .form-group textarea:focus { border-color: #0e4b6e; }
-        .modal .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .modal .btn-group { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
-        .modal .reschedule-hint { background: #fef3c7; padding: 8px 12px; border-radius: 8px; font-size: 12px; color: #92400e; margin-bottom: 12px; }
-        .modal .reschedule-history { background: #f1f5f9; padding: 8px 12px; border-radius: 8px; font-size: 12px; color: #475569; margin-bottom: 12px; }
-        
+        .modal { background: white; border-radius: 16px; padding: 20px 24px; width: 100%; max-width: 640px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2); }
+        .modal h2 { font-size: 16px; margin-bottom: 14px; }
+        .mini-list { border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 14px; max-height: 240px; overflow-y: auto; }
+        .mini-list-item { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; font-size: 12px; }
+        .mini-list-item:last-child { border-bottom: none; }
+        .mini-list-item .info { flex: 1; }
+        .mini-list-item .info b { display: block; }
+        .mini-list-item .info span { color: #94a3b8; font-size: 11px; }
+
         .toast { position: fixed; bottom: 20px; right: 20px; background: #0e4b6e; color: white; padding: 10px 20px; border-radius: 50px; font-size: 13px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); z-index: 2000; opacity: 0; transform: translateY(20px); transition: all 0.3s ease; }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { background: #16a34a; }
         .toast.error { background: #dc2626; }
         .hidden { display: none !important; }
-        
+
         @media (max-width: 640px) {
-            .stats { grid-template-columns: repeat(3, 1fr); }
-            .toolbar { flex-direction: column; align-items: stretch; }
-            .toolbar input[type="text"] { width: 100%; }
+            .form-row, .form-row-3 { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
     <div class="lock-screen" id="lockScreen">
         <div class="lock-box">
-            <h2>🔒 跟单管理系统</h2>
+            <h2>🔒 采购跟单系统</h2>
             <input type="password" id="passwordInput" placeholder="请输入密码" autofocus>
             <button id="unlockBtn" disabled>正在校验云端密码...</button>
         </div>
@@ -91,100 +102,196 @@
 
     <div class="container hidden" id="mainContent">
         <div class="header">
-            <h1>📋 采购 · 发货跟单 <span>v4.6</span></h1>
+            <h1>📋 采购跟单系统 <span>v2.0</span></h1>
             <div class="header-right">
                 <span class="sync-status success" id="syncStatus">⏳ 载入中...</span>
-                <button class="btn btn-outline" onclick="exportExcel()">📥 导出 Excel</button>
-                <button class="btn btn-outline" onclick="document.getElementById('importFile').click()">📤 导入</button>
-                <input type="file" id="importFile" accept=".xlsx, .xls" style="display:none" onchange="importExcel(event)">
+                <button class="btn btn-outline" onclick="openSupplierModal()">🏭 供应商资料库</button>
+                <button class="btn btn-outline" onclick="backupAllData()">💾 备份全部数据</button>
                 <button class="btn btn-outline" onclick="changePassword()">🔑 改密</button>
                 <button class="btn btn-outline" onclick="lockScreen()">🔒 锁定</button>
             </div>
         </div>
 
-        <div class="stats">
-            <div class="stat-card"><div class="number" id="statTotal">0</div><div class="label">📋 全部</div></div>
-            <div class="stat-card"><div class="number" id="statPending">0</div><div class="label">⏳ 待跟进</div></div>
-            <div class="stat-card"><div class="number" id="statProgress">0</div><div class="label">🔄 进行中</div></div>
-            <div class="stat-card overdue"><div class="number" id="statOverdue">0</div><div class="label">⚠️ 逾期</div></div>
-            <div class="stat-card rescheduled"><div class="number" id="statRescheduled">0</div><div class="label">🔄 曾逾期</div></div>
-            <div class="stat-card done"><div class="number" id="statDone">0</div><div class="label">✅ 已完成</div></div>
+        <!-- ========== 列表视图 ========== -->
+        <div id="listView">
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="🔍 搜索供应商/单号..." oninput="renderList()">
+                <select id="filterYear" onchange="renderList()"><option value="">全部年份</option></select>
+                <label class="checkbox-row" style="margin-left:4px;"><input type="checkbox" id="showDeletedCheckbox" onchange="renderList()"> 显示已删除订单</label>
+                <div style="flex:1;"></div>
+                <button class="btn btn-outline" onclick="openPriceHistoryModal()">📊 历史价格查询</button>
+                <button class="btn btn-primary" onclick="openOrderDetail(null)">➕ 新建采购单</button>
+            </div>
+            <div class="table-wrapper">
+                <table class="list-table">
+                    <thead>
+                        <tr>
+                            <th>订单号</th>
+                            <th>供应商简称</th>
+                            <th>总数量</th>
+                            <th>总金额</th>
+                            <th>交期</th>
+                            <th>是否逾期</th>
+                            <th>逾期后跟进日</th>
+                            <th>订单完成</th>
+                            <th>是否付款</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderTableBody"></tbody>
+                </table>
+            </div>
         </div>
 
-        <div class="toolbar">
-            <input type="text" id="searchInput" placeholder="🔍 搜索..." oninput="render()">
-            <div style="flex:1;"></div>
-            <button class="btn btn-primary" onclick="openModal()">➕ 新建跟进</button>
-        </div>
+        <!-- ========== 订单详情视图 ========== -->
+        <div id="detailView" class="hidden">
+            <div class="card">
+                <h2 id="detailTitle">📝 新建采购单</h2>
 
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>任务标题</th>
-                        <th>供应商</th>
-                        <th>类型</th>
-                        <th>订单号</th>
-                        <th>下单日</th>
-                        <th>跟进日</th>
-                        <th>逾期后<br>跟进日</th>
-                        <th>逾期<br>次数</th>
-                        <th>状态</th>
-                        <th>备注</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="tableBody"></tbody>
-            </table>
+                <div id="rescheduleHint" class="reschedule-hint hidden">⚠️ 该订单已逾期，请填写"逾期后跟进日期"后再保存</div>
+
+                <div class="form-row-3">
+                    <div class="form-group"><label>订单号</label><input type="text" id="fOrderNo" disabled placeholder="保存时自动生成"></div>
+                    <div class="form-group"><label>下单日期</label><input type="date" id="fOrderDate"></div>
+                    <div class="form-group"><label>交期</label><input type="date" id="fDeliveryDate"></div>
+                </div>
+                <div class="form-group hidden" id="rescheduleDateGroup">
+                    <label>📅 逾期后跟进日期 *</label><input type="date" id="fFollowUpDate">
+                </div>
+
+                <div class="form-group">
+                    <label>选择供应商（从供应商资料库自动填充，也可直接手动填写下方信息）</label>
+                    <select id="fSupplierSelect" onchange="fillSupplierFromSelect()">
+                        <option value="">-- 手动填写 / 选择已有供应商 --</option>
+                    </select>
+                </div>
+                <div class="form-row-3">
+                    <div class="form-group"><label>公司名 *</label><input type="text" id="fSupplierCompany"></div>
+                    <div class="form-group"><label>供应商简称</label><input type="text" id="fSupplierShort"></div>
+                    <div class="form-group"><label>联系人</label><input type="text" id="fSupplierContact"></div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group"><label>电话</label><input type="text" id="fSupplierPhone"></div>
+                    <div class="form-group"><label>地址</label><input type="text" id="fSupplierAddress"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>货品明细</label>
+                    <table class="items-table" id="itemsTable">
+                        <thead><tr><th style="width:32%">品名</th><th style="width:20%">尺寸/规格</th><th style="width:16%">单价</th><th style="width:16%">数量</th><th style="width:16%">金额</th><th style="width:5%"></th></tr></thead>
+                        <tbody id="itemsTableBody"></tbody>
+                    </table>
+                    <button class="btn btn-outline btn-sm" onclick="addItemRow()">➕ 添加一行</button>
+                    <div class="items-total" id="itemsTotalDisplay">合计数量：0　｜　合计金额：0.00</div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group"><label>包装要求</label><textarea id="fPacking" rows="2"></textarea></div>
+                    <div class="form-group"><label>图纸备注（非标定制，如图纸编号/文件名，不上传实际图片）</label><textarea id="fDrawingNote" rows="2"></textarea></div>
+                </div>
+
+                <div class="form-row">
+                    <div class="checkbox-row"><input type="checkbox" id="fCompleted"> <label for="fCompleted">订单已完成</label></div>
+                    <div class="checkbox-row"><input type="checkbox" id="fPaid"> <label for="fPaid">已付款</label></div>
+                </div>
+
+                <div class="form-group"><label>备注</label><textarea id="fRemark" rows="2"></textarea></div>
+                <input type="hidden" id="fWasOverdue" value="0">
+
+                <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                    <button class="btn btn-primary" id="saveOrderBtn" onclick="saveOrder()">💾 保存订单</button>
+                    <button class="btn btn-outline" onclick="exportOrderContract()">📥 导出订购合同</button>
+                    <button class="btn btn-outline" id="copyOrderBtn" onclick="copyCurrentOrder()" style="display:none;">📋 复制为新订单</button>
+                    <button class="btn btn-outline" onclick="backToList()">← 返回列表</button>
+                    <button class="btn btn-danger" id="deleteOrderBtn" onclick="deleteCurrentOrder()" style="display:none;">🗑️ 删除订单</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="modal-overlay" id="modalOverlay">
+    <!-- ========== 供应商资料库弹窗 ========== -->
+    <div class="modal-overlay" id="supplierModal">
         <div class="modal">
-            <h2 id="modalTitle">📝 跟进</h2>
-            <div id="rescheduleHint" class="reschedule-hint" style="display:none;">⚠️ 已逾期，请输入新跟进日期</div>
-            <div id="rescheduleHistory" class="reschedule-history" style="display:none;">逾期 <strong id="historyOverdueCount">0</strong> 次</div>
-            <div class="form-group"><label>标题 *</label><input type="text" id="formTitle"></div>
-            <div class="form-group"><label>供应商 *</label><input type="text" id="formParty"></div>
-            <div class="form-row">
-                <div class="form-group"><label>类型</label><select id="formType"><option>采购</option><option>发货</option></select></div>
-                <div class="form-group"><label>订单编号</label><input type="text" id="formOrderNo"></div>
+            <h2>🏭 供应商资料库</h2>
+            <div class="mini-list" id="supplierList"></div>
+            <div class="form-row-3">
+                <div class="form-group"><label>公司名</label><input type="text" id="newSupCompany"></div>
+                <div class="form-group"><label>供应商简称</label><input type="text" id="newSupShort"></div>
+                <div class="form-group"><label>联系人</label><input type="text" id="newSupContact"></div>
             </div>
             <div class="form-row">
-                <div class="form-group"><label>下单日</label><input type="date" id="formOrderDate"></div>
-                <div class="form-group"><label>跟进日</label><input type="date" id="formFollowDate"></div>
+                <div class="form-group"><label>电话</label><input type="text" id="newSupPhone"></div>
+                <div class="form-group"><label>地址</label><input type="text" id="newSupAddress"></div>
             </div>
-            <div class="form-group" id="rescheduleDateGroup" style="display:none;">
-                <label>📅 新跟进日</label><input type="date" id="formRescheduleDate">
-            </div>
-            <div class="form-group"><label>状态</label>
-                <select id="formStatus"><option value="pending">待跟进</option><option value="progress">进行中</option><option value="done">已完成</option></select>
-            </div>
-            <div class="form-group"><label>备注</label><textarea id="formNote" rows="3"></textarea></div>
-            <input type="hidden" id="formEditId"><input type="hidden" id="formRescheduleCount" value="0"><input type="hidden" id="formWasOverdue" value="0">
-            <div class="btn-group">
-                <button class="btn btn-outline" onclick="closeModal()">取消</button>
-                <button class="btn btn-primary" onclick="saveTask()">💾 保存</button>
+            <div style="display:flex; gap:10px; justify-content:flex-end;">
+                <button class="btn btn-outline" onclick="closeModal('supplierModal')">关闭</button>
+                <button class="btn btn-primary" onclick="addSupplier()">➕ 添加供应商</button>
             </div>
         </div>
     </div>
+
+    <!-- ========== 历史价格查询弹窗 ========== -->
+    <div class="modal-overlay" id="priceHistoryModal">
+        <div class="modal" style="max-width:800px;">
+            <h2>📊 历史价格查询</h2>
+            <div class="form-group">
+                <label>供应商</label>
+                <select id="phSupplierSelect"><option value="">-- 请选择供应商 --</option></select>
+            </div>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>品名关键词（留空则不限品名）</label>
+                    <input type="text" id="phProductKeyword" placeholder="如：端铣刀">
+                </div>
+                <div class="form-group">
+                    <label>尺寸/规格关键词（留空则不限尺寸）</label>
+                    <input type="text" id="phSizeKeyword" placeholder="如：R3*12*D6*50L*2F">
+                </div>
+            </div>
+            <div style="display:flex; gap:10px; margin-bottom:14px;">
+                <button class="btn btn-primary" onclick="runPriceHistoryQuery()">🔍 查询</button>
+                <button class="btn btn-outline" onclick="closeModal('priceHistoryModal')">关闭</button>
+            </div>
+            <div class="table-wrapper">
+                <table class="list-table" style="min-width:600px;">
+                    <thead>
+                        <tr><th>下单日期</th><th>订单号</th><th>品名</th><th>尺寸/规格</th><th>数量</th><th>单价</th></tr>
+                    </thead>
+                    <tbody id="priceHistoryBody"><tr><td colspan="6" style="padding:20px;text-align:center;">请选择供应商后点查询</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <script>
-        // ====== 最终修正的配置信息 ======
-        const STORAGE_KEY = 'my_purchase_tasks';
-        const BIN_ID = '6a7af37ef5f4af5e29068975';  // 您的仓库ID
-        const API_KEY = '$2a$10$c/WS5/Q7Qhve2SOyX1tBheXQhPGIQ4fDhvNcm6hoOIqN77H.2txgu'; // 您的Master Key（已修正）
-        
-        let tasks = [];
+        // ====== 配置信息 ======
+        const STORAGE_KEY = 'procurement_orders_v2';
+        const BIN_ID = '6a7af37ef5f4af5e29068975';  // 沿用原有采购跟单系统的Bin
+        const WORKER_URL = 'https://sunlit-proxy.ivy-3fc.workers.dev';
+        const ACCESS_TOKEN = 'RBhCP4O1yvwxN7nB9oMoQCzuj2ZnF3M9daOE76fRVtk';
+
+        // 采购方固定信息（你们自己公司，导出合同时使用）
+        const BUYER = {
+            name: 'Shenzhen Sunlit Tools Co.,LTD',
+            address: 'NO.39 Hexing Street, Buji,Longgang, Shenzhen, China 518112',
+            tel: '0755-28703533/0086-18476323881',
+            contact: 'Ivy'
+        };
+
+        let orders = [];
+        let suppliers = [];
         let APP_PASSWORD = localStorage.getItem('my_app_pwd') || 'admin123';
+        let currentOrderNo = null;
 
         // ====== 锁屏 ======
         document.getElementById('unlockBtn').onclick = function() {
             if (document.getElementById('passwordInput').value === APP_PASSWORD) {
                 document.getElementById('lockScreen').style.display = 'none';
                 document.getElementById('mainContent').classList.remove('hidden');
-                render();
+                renderList();
             } else alert('密码错误');
         };
         document.getElementById('passwordInput').addEventListener('keydown', e => { if(e.key === 'Enter') document.getElementById('unlockBtn').click(); });
@@ -199,68 +306,54 @@
             if (p && p.trim()) {
                 APP_PASSWORD = p.trim();
                 localStorage.setItem('my_app_pwd', APP_PASSWORD);
-                pushCloudData({ password: APP_PASSWORD, tasks: tasks });
+                pushCloudData();
                 showToast('密码已改，已同步到云端');
             }
         }
 
-        // ====== 核心同步（含详细错误输出） ======
+        // ====== 云端同步 ======
         async function getCloudData() {
             try {
-                console.log(`开始拉取云端数据: BIN_ID=${BIN_ID}`);
-                let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { 
-                    headers: { 'X-Master-Key': API_KEY } 
-                });
+                let res = await fetch(`${WORKER_URL}/bin/${BIN_ID}/latest`, { headers: { 'X-Access-Token': ACCESS_TOKEN } });
                 if (res.ok) {
                     let json = await res.json();
-                    let record = json.record;
-                    // 兼容旧格式：云端直接存的是任务数组（没有密码字段）
-                    if (Array.isArray(record)) {
-                        return { password: null, tasks: record };
+                    let r = json.record;
+                    if (r && typeof r === 'object' && !Array.isArray(r)) {
+                        return {
+                            password: r.password || null,
+                            orders: Array.isArray(r.orders) ? r.orders : [],
+                            suppliers: Array.isArray(r.suppliers) ? r.suppliers : []
+                        };
                     }
-                    // 新格式：云端存的是 { password, tasks } 对象
-                    if (record && typeof record === 'object') {
-                        return { password: record.password || null, tasks: Array.isArray(record.tasks) ? record.tasks : [] };
-                    }
+                    // 兼容旧格式（v1的任务数组）：识别到旧格式后直接视为空的新结构，旧数据不做迁移
+                    return { password: null, orders: [], suppliers: [] };
                 } else {
                     console.log(`拉取失败，状态码: ${res.status}`);
                 }
-            } catch(e) {
-                console.log("拉取云端发生网络/解析错误:", e);
-            }
+            } catch(e) { console.log("拉取云端发生网络/解析错误:", e); }
             return null;
         }
 
-        async function pushCloudData(data) {
+        async function pushCloudData() {
             try {
-                console.log(`准备上传数据到云端: BIN_ID=${BIN_ID}`);
-                let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                let payload = { password: APP_PASSWORD, orders, suppliers };
+                let res = await fetch(`${WORKER_URL}/bin/${BIN_ID}`, {
                     method: 'PUT',
-                    headers: { 
-                        'Content-Type': 'application/json', 
-                        'X-Master-Key': API_KEY 
-                    },
-                    body: JSON.stringify(data)
+                    headers: { 'Content-Type': 'application/json', 'X-Access-Token': ACCESS_TOKEN },
+                    body: JSON.stringify(payload)
                 });
-                if(res.ok){
-                     console.log("数据上传成功！云端已更新。");
-                     return true;
-                } else {
-                     console.error("上传失败，服务器返回错误码:", res.status, res.statusText);
-                     return false;
-                }
-            } catch(e) { 
-                console.error("上传过程发生严重错误（网络不通、跨域等）:", e);
-                return false; 
-            }
+                if (res.ok) return true;
+                console.error("上传失败:", res.status);
+                return false;
+            } catch(e) { console.error("上传错误:", e); return false; }
         }
 
-        // ====== 启动流程：页面一加载就在后台拉取云端数据（密码+任务），不必等解锁 ======
         async function preloadCloud() {
             let cloud = await getCloudData();
             if (cloud) {
-                tasks = cloud.tasks;
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+                orders = cloud.orders;
+                suppliers = cloud.suppliers;
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers }));
                 if (cloud.password) {
                     APP_PASSWORD = cloud.password;
                     localStorage.setItem('my_app_pwd', APP_PASSWORD);
@@ -268,164 +361,531 @@
                 document.getElementById('syncStatus').innerText = "✅ 已同步云端";
                 document.getElementById('syncStatus').className = "sync-status success";
             } else {
-                // 云端连不上/没数据，用本地缓存兜底
                 let local = localStorage.getItem(STORAGE_KEY);
                 if (local) {
-                    tasks = JSON.parse(local);
+                    let d = JSON.parse(local);
+                    orders = d.orders || []; suppliers = d.suppliers || [];
                     document.getElementById('syncStatus').innerText = "⚠️ 本地数据(云端无数据)";
                 } else {
                     document.getElementById('syncStatus').innerText = "📂 空系统";
                 }
                 document.getElementById('syncStatus').className = "sync-status error";
             }
-            // 密码已就绪（云端或本地兜底），此时才允许解锁，避免用过期密码校验
             let btn = document.getElementById('unlockBtn');
             btn.disabled = false;
             btn.innerText = "解锁";
         }
         preloadCloud();
 
-        // ====== 保存数据 ======
-        function saveTasks() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
-            // 数据（含密码）上云
-            pushCloudData({ password: APP_PASSWORD, tasks: tasks });
-            render();
-            showToast('数据已保存');
+        function saveAll() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ orders, suppliers }));
+            pushCloudData();
+        }
+
+        function backupAllData() {
+            let payload = { exportedAt: new Date().toISOString(), orders, suppliers };
+            let blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+            let url = URL.createObjectURL(blob);
+            let a = document.createElement('a');
+            a.href = url;
+            a.download = `采购跟单系统_备份_${getToday()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            showToast('备份文件已下载');
         }
 
         // ====== 工具函数 ======
         function getToday() { return new Date().toISOString().split('T')[0]; }
         function formatDate(d) { return d ? new Date(d).toLocaleDateString('zh-CN') : '—'; }
-        function genId() { return Date.now().toString(36) + Math.random().toString(36).substring(2, 6); }
-        function calcOverdue(f) { if (!f) return 0; let t = getToday(); return f < t ? Math.floor((new Date(t) - new Date(f)) / (86400000)) : 0; }
-
-        function render() {
-            const t = getToday();
-            tasks.forEach(x => { if (x.status !== 'done' && x.followDate && x.followDate < t) x.status = 'overdue'; });
-            
-            let html = tasks.map(x => {
-                let over = calcOverdue(x.followDate);
-                let isOver = x.status === 'overdue';
-                let statusMap = { pending:'⏳ 待跟进', progress:'🔄 进行中', done:'✅ 已完成', overdue:`⚠️ 逾期 ${over}天` };
-                return `<tr class="${isOver?'overdue-row':''}">
-                    <td><strong>${x.title}</strong></td><td>${x.party||'—'}</td><td>${x.type||'采购'}</td>
-                    <td>${x.orderNo||'—'}</td><td>${formatDate(x.orderDate)}</td>
-                    <td>${formatDate(x.followDate)}${isOver?' ⚠️':''}</td>
-                    <td>${x.rescheduleDate?formatDate(x.rescheduleDate):'—'}</td>
-                    <td>${(x.rescheduleCount||0)>0 ? `🔄 ${x.rescheduleCount}次` : '—'}</td>
-                    <td><span class="status-badge status-${x.status}">${statusMap[x.status]}</span></td>
-                    <td style="max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${x.note||'—'}</td>
-                    <td>
-                        <button onclick="editTask('${x.id}')">✏️</button>
-                        ${isOver ? `<button onclick="editTask('${x.id}')" style="color:#f59e0b;">📅</button>` : ''}
-                        <button onclick="deleteTask('${x.id}')" style="color:#dc2626;">🗑️</button>
-                    </td>
-                </tr>`;
-            }).join('');
-            document.getElementById('tableBody').innerHTML = html || '<tr><td colspan="11" style="padding:30px;text-align:center;">暂无数据</td></tr>';
-            document.getElementById('statTotal').innerText = tasks.length;
-            document.getElementById('statPending').innerText = tasks.filter(x=>x.status==='pending').length;
-            document.getElementById('statOverdue').innerText = tasks.filter(x=>x.status==='overdue').length;
-            document.getElementById('statDone').innerText = tasks.filter(x=>x.status==='done').length;
-            document.getElementById('statRescheduled').innerText = tasks.filter(x=>(x.rescheduleCount||0)>0).length;
-        }
-
-        function openModal(data) {
-            let isOver = data && data.status === 'overdue';
-            document.getElementById('modalOverlay').classList.add('active');
-            document.getElementById('modalTitle').innerText = isOver ? '⚠️ 重新安排' : (data ? '✏️ 编辑' : '📝 新建');
-            document.getElementById('rescheduleHint').style.display = isOver ? 'block' : 'none';
-            document.getElementById('rescheduleDateGroup').style.display = isOver ? 'block' : 'none';
-            document.getElementById('formTitle').value = data ? data.title : '';
-            document.getElementById('formParty').value = data ? data.party : '';
-            document.getElementById('formType').value = data ? data.type : '采购';
-            document.getElementById('formOrderNo').value = data ? data.orderNo : '';
-            document.getElementById('formOrderDate').value = data ? data.orderDate : getToday();
-            document.getElementById('formFollowDate').value = data ? data.followDate : '';
-            document.getElementById('formRescheduleDate').value = isOver ? getToday() : '';
-            document.getElementById('formStatus').value = data ? (isOver ? 'pending' : data.status) : 'pending';
-            document.getElementById('formNote').value = data ? data.note : '';
-            document.getElementById('formEditId').value = data ? data.id : '';
-            document.getElementById('formRescheduleCount').value = data ? data.rescheduleCount || 0 : 0;
-            document.getElementById('formWasOverdue').value = isOver ? '1' : '0';
-        }
-        function closeModal() { document.getElementById('modalOverlay').classList.remove('active'); }
-
-        function saveTask() {
-            let title = document.getElementById('formTitle').value.trim();
-            let party = document.getElementById('formParty').value.trim();
-            if (!title || !party) { showToast('请填写标题和供应商', 'error'); return; }
-
-            let id = document.getElementById('formEditId').value;
-            // 用打开弹窗时记录的状态判断是否需要"重新安排"，而不是重新计算——
-            // 避免新建任务/编辑非逾期任务时，因为表单里的跟进日恰好早于今天而被误判成"逾期重新安排"
-            let isOver = document.getElementById('formWasOverdue').value === '1';
-
-            // 先校验，校验不通过直接return，此时还没动tasks数组，不会产生幽灵记录
-            let newDate = '';
-            if (isOver) {
-                newDate = document.getElementById('formRescheduleDate').value;
-                if (!newDate) { showToast('请选择新日期', 'error'); return; }
-            }
-
-            let data = {
-                title, party, type: document.getElementById('formType').value,
-                orderNo: document.getElementById('formOrderNo').value.trim(),
-                orderDate: document.getElementById('formOrderDate').value,
-                followDate: document.getElementById('formFollowDate').value,
-                status: document.getElementById('formStatus').value,
-                note: document.getElementById('formNote').value.trim()
-            };
-
-            if (id) {
-                let idx = tasks.findIndex(x => x.id === id);
-                if (idx !== -1) tasks[idx] = { ...tasks[idx], ...data };
-            } else {
-                data.id = genId();
-                tasks.push(data);
-            }
-
-            // 专门处理逾期重新安排
-            if (isOver) {
-                let idx = tasks.findIndex(x => x.id === (id || data.id));
-                if (idx !== -1) {
-                    tasks[idx].rescheduleDate = newDate;
-                    tasks[idx].rescheduleCount = (tasks[idx].rescheduleCount || 0) + 1;
-                    tasks[idx].followDate = newDate;
-                    tasks[idx].status = 'pending';
-                }
-            }
-
-            saveTasks();
-            closeModal();
-        }
-
-        function editTask(id) { let t = tasks.find(x=>x.id===id); if(t) openModal(t); }
-        function deleteTask(id) { if(confirm('删除？')) { tasks = tasks.filter(x=>x.id!==id); saveTasks(); } }
-
-        function exportExcel() {
-            if (!tasks.length) { showToast('无数据', 'error'); return; }
-            let wb = XLSX.utils.book_new();
-            let ws = XLSX.utils.json_to_sheet(tasks);
-            XLSX.utils.book_append_sheet(wb, ws, "跟单");
-            XLSX.writeFile(wb, `跟单数据_${getToday()}.xlsx`);
-            showToast('导出成功');
-        }
-        function importExcel(e) {
-            let f = e.target.files[0]; if(!f) return;
-            let r = new FileReader();
-            r.onload = function(ev) {
-                let wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-                let d = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                if(d.length) { d.forEach(x=>{ if(!x.id) x.id=genId(); }); tasks = tasks.concat(d); saveTasks(); showToast(`导入 ${d.length} 条`); }
-            };
-            r.readAsArrayBuffer(f); e.target.value='';
+        function escapeHtml(s) {
+            if (s === undefined || s === null) return '';
+            return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
         }
         function showToast(msg, type='success') {
             let el = document.getElementById('toast');
             el.innerText = msg; el.className = `toast ${type}`; el.classList.add('show');
             clearTimeout(el._timer); el._timer = setTimeout(()=>el.classList.remove('show'), 2500);
+        }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // ====== 供应商资料库 ======
+        function openSupplierModal() {
+            renderSupplierList();
+            document.getElementById('supplierModal').classList.add('active');
+        }
+        function renderSupplierList() {
+            let html = suppliers.map((s, i) => `
+                <div class="mini-list-item">
+                    <div class="info"><b>${s.shortName ? escapeHtml(s.shortName) + '　' : ''}${escapeHtml(s.company)}</b><span>${escapeHtml(s.contact) || '—'} ｜ ${escapeHtml(s.phone) || '—'}</span></div>
+                    <button class="btn btn-danger btn-sm" onclick="deleteSupplier(${i})">删除</button>
+                </div>
+            `).join('');
+            document.getElementById('supplierList').innerHTML = html || '<div class="mini-list-item">暂无供应商，请在下方添加</div>';
+        }
+        function addSupplier() {
+            let company = document.getElementById('newSupCompany').value.trim();
+            if (!company) { showToast('请填写公司名', 'error'); return; }
+            suppliers.push({
+                id: 's_' + Date.now(),
+                company,
+                shortName: document.getElementById('newSupShort').value.trim(),
+                contact: document.getElementById('newSupContact').value.trim(),
+                phone: document.getElementById('newSupPhone').value.trim(),
+                address: document.getElementById('newSupAddress').value.trim()
+            });
+            saveAll();
+            renderSupplierList();
+            populateSupplierSelect();
+            ['newSupCompany','newSupShort','newSupContact','newSupPhone','newSupAddress'].forEach(id => document.getElementById(id).value = '');
+            showToast('供应商已添加');
+        }
+        function deleteSupplier(idx) {
+            if (!confirm('删除这个供应商资料？')) return;
+            suppliers.splice(idx, 1);
+            saveAll();
+            renderSupplierList();
+            populateSupplierSelect();
+        }
+        function populateSupplierSelect() {
+            let sel = document.getElementById('fSupplierSelect');
+            sel.innerHTML = '<option value="">-- 手动填写 / 选择已有供应商 --</option>' +
+                suppliers.map(s => `<option value="${s.id}">${escapeHtml(s.shortName ? s.shortName + ' - ' : '')}${escapeHtml(s.company)}</option>`).join('');
+        }
+        function fillSupplierFromSelect() {
+            let id = document.getElementById('fSupplierSelect').value;
+            let s = suppliers.find(x => x.id === id);
+            if (s) {
+                document.getElementById('fSupplierCompany').value = s.company || '';
+                document.getElementById('fSupplierShort').value = s.shortName || '';
+                document.getElementById('fSupplierContact').value = s.contact || '';
+                document.getElementById('fSupplierPhone').value = s.phone || '';
+                document.getElementById('fSupplierAddress').value = s.address || '';
+            }
+        }
+
+        // ====== 货品明细行 ======
+        function addItemRow(item) {
+            item = item || { name: '', size: '', price: '', qty: '' };
+            let tbody = document.getElementById('itemsTableBody');
+            let tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="item-name" value="${escapeHtml(item.name)}"></td>
+                <td><input type="text" class="item-size" value="${escapeHtml(item.size)}"></td>
+                <td><input type="text" class="item-price" value="${escapeHtml(item.price)}" oninput="updateItemsTotal()"></td>
+                <td><input type="text" class="item-qty" value="${escapeHtml(item.qty)}" oninput="updateItemsTotal()"></td>
+                <td><input type="text" class="item-amount" value="${escapeHtml(item.amount || '')}" readonly style="background:#f8fafc;"></td>
+                <td><button class="del-row" onclick="this.closest('tr').remove(); updateItemsTotal();">🗑️</button></td>
+            `;
+            tbody.appendChild(tr);
+            updateItemsTotal();
+        }
+        function updateItemsTotal() {
+            let rows = document.querySelectorAll('#itemsTableBody tr');
+            let totalQty = 0, totalAmount = 0;
+            rows.forEach(r => {
+                let qty = parseFloat(r.querySelector('.item-qty').value) || 0;
+                let price = parseFloat(r.querySelector('.item-price').value) || 0;
+                let amount = qty * price;
+                r.querySelector('.item-amount').value = amount ? amount.toFixed(2) : '';
+                totalQty += qty;
+                totalAmount += amount;
+            });
+            document.getElementById('itemsTotalDisplay').innerText = `合计数量：${totalQty}　｜　合计金额：${totalAmount.toFixed(2)}`;
+        }
+        function getItemsFromForm() {
+            let rows = document.querySelectorAll('#itemsTableBody tr');
+            let items = [];
+            rows.forEach(r => {
+                let name = r.querySelector('.item-name').value.trim();
+                let size = r.querySelector('.item-size').value.trim();
+                let price = r.querySelector('.item-price').value.trim();
+                let qty = r.querySelector('.item-qty').value.trim();
+                let amount = r.querySelector('.item-amount').value.trim();
+                if (name || size || qty) items.push({ name, size, price, qty, amount });
+            });
+            return items;
+        }
+
+        // ====== 订单号生成 ======
+        function genOrderNo() {
+            let today = getToday().replace(/-/g, '').slice(2); // YYMMDD
+            let prefix = `SO-SL${today}-T`;
+            let sameDay = orders.filter(o => o.orderNo && o.orderNo.startsWith(prefix));
+            let seq = (sameDay.length + 1).toString().padStart(3, '0');
+            return `${prefix}${seq}`;
+        }
+
+        // 判断一个订单当前是否处于"逾期"状态：以逾期后跟进日期为准（如果有），否则用交期
+        function isOrderOverdue(o, today) {
+            today = today || getToday();
+            if (o.completed) return false;
+            let effectiveDate = o.followUpDate || o.deliveryDate;
+            return !!(effectiveDate && effectiveDate < today);
+        }
+
+        // ====== 视图切换 ======
+        function backToList() { document.getElementById('detailView').classList.add('hidden'); document.getElementById('listView').classList.remove('hidden'); renderList(); }
+
+        function openOrderDetail(orderNo) {
+            populateSupplierSelect();
+            document.getElementById('listView').classList.add('hidden');
+            document.getElementById('detailView').classList.remove('hidden');
+            document.getElementById('itemsTableBody').innerHTML = '';
+
+            if (orderNo) {
+                let o = orders.find(x => x.orderNo === orderNo);
+                if (!o) return;
+                currentOrderNo = orderNo;
+                let wasOverdue = isOrderOverdue(o);
+                document.getElementById('detailTitle').innerText = wasOverdue ? `⚠️ 订单已逾期 ${orderNo}` : `✏️ 编辑订单 ${orderNo}`;
+                document.getElementById('fOrderNo').value = o.orderNo;
+                document.getElementById('fOrderDate').value = o.orderDate || '';
+                document.getElementById('fDeliveryDate').value = o.deliveryDate || '';
+                document.getElementById('fSupplierSelect').value = '';
+                document.getElementById('fSupplierCompany').value = o.supplierCompany || '';
+                document.getElementById('fSupplierShort').value = o.supplierShort || '';
+                document.getElementById('fSupplierContact').value = o.supplierContact || '';
+                document.getElementById('fSupplierPhone').value = o.supplierPhone || '';
+                document.getElementById('fSupplierAddress').value = o.supplierAddress || '';
+                document.getElementById('fPacking').value = o.packing || '';
+                document.getElementById('fDrawingNote').value = o.drawingNote || '';
+                document.getElementById('fCompleted').checked = !!o.completed;
+                document.getElementById('fPaid').checked = !!o.paid;
+                document.getElementById('fRemark').value = o.remark || '';
+                (o.items || []).forEach(it => addItemRow(it));
+                document.getElementById('deleteOrderBtn').style.display = 'inline-flex';
+                document.getElementById('copyOrderBtn').style.display = 'inline-flex';
+
+                document.getElementById('fWasOverdue').value = wasOverdue ? '1' : '0';
+                document.getElementById('rescheduleHint').classList.toggle('hidden', !wasOverdue);
+                document.getElementById('rescheduleDateGroup').classList.toggle('hidden', !wasOverdue);
+                document.getElementById('fFollowUpDate').value = wasOverdue ? getToday() : (o.followUpDate || '');
+            } else {
+                currentOrderNo = null;
+                document.getElementById('detailTitle').innerText = '📝 新建采购单';
+                document.getElementById('fOrderNo').value = '（保存时自动生成）';
+                document.getElementById('fOrderDate').value = getToday();
+                document.getElementById('fDeliveryDate').value = '';
+                document.getElementById('fSupplierSelect').value = '';
+                document.getElementById('fSupplierCompany').value = '';
+                document.getElementById('fSupplierShort').value = '';
+                document.getElementById('fSupplierContact').value = '';
+                document.getElementById('fSupplierPhone').value = '';
+                document.getElementById('fSupplierAddress').value = '';
+                document.getElementById('fPacking').value = '';
+                document.getElementById('fDrawingNote').value = '';
+                document.getElementById('fCompleted').checked = false;
+                document.getElementById('fPaid').checked = false;
+                document.getElementById('fRemark').value = '';
+                addItemRow();
+                document.getElementById('deleteOrderBtn').style.display = 'none';
+                document.getElementById('copyOrderBtn').style.display = 'none';
+
+                document.getElementById('fWasOverdue').value = '0';
+                document.getElementById('rescheduleHint').classList.add('hidden');
+                document.getElementById('rescheduleDateGroup').classList.add('hidden');
+                document.getElementById('fFollowUpDate').value = '';
+            }
+            updateItemsTotal();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ====== 保存/复制/删除订单 ======
+        function saveOrder() {
+            let supplierCompany = document.getElementById('fSupplierCompany').value.trim();
+            if (!supplierCompany) { showToast('请填写供应商公司名', 'error'); return; }
+            let items = getItemsFromForm();
+            if (items.length === 0) { showToast('请至少填写一条货品明细', 'error'); return; }
+
+            // 用打开详情页时记录的状态判断是否需要"逾期后跟进"，避免出现校验通过前数据已被污染的问题
+            let wasOverdue = document.getElementById('fWasOverdue').value === '1';
+            let newFollowUpDate = '';
+            if (wasOverdue) {
+                newFollowUpDate = document.getElementById('fFollowUpDate').value;
+                if (!newFollowUpDate) { showToast('请填写逾期后跟进日期', 'error'); return; }
+            }
+
+            let orderNo = currentOrderNo || genOrderNo();
+            let existing = currentOrderNo ? orders.find(o => o.orderNo === currentOrderNo) : null;
+
+            let data = {
+                orderNo,
+                orderDate: document.getElementById('fOrderDate').value || getToday(),
+                deliveryDate: document.getElementById('fDeliveryDate').value,
+                supplierCompany,
+                supplierShort: document.getElementById('fSupplierShort').value.trim(),
+                supplierContact: document.getElementById('fSupplierContact').value.trim(),
+                supplierPhone: document.getElementById('fSupplierPhone').value.trim(),
+                supplierAddress: document.getElementById('fSupplierAddress').value.trim(),
+                items,
+                packing: document.getElementById('fPacking').value.trim(),
+                drawingNote: document.getElementById('fDrawingNote').value.trim(),
+                completed: document.getElementById('fCompleted').checked,
+                paid: document.getElementById('fPaid').checked,
+                remark: document.getElementById('fRemark').value.trim(),
+                followUpDate: existing ? existing.followUpDate : null,
+                overdueCount: existing ? (existing.overdueCount || 0) : 0
+            };
+
+            if (wasOverdue) {
+                data.followUpDate = newFollowUpDate;
+                data.overdueCount = (data.overdueCount || 0) + 1;
+            }
+
+            if (currentOrderNo) {
+                let idx = orders.findIndex(o => o.orderNo === currentOrderNo);
+                if (idx !== -1) orders[idx] = data;
+            } else {
+                orders.push(data);
+            }
+
+            saveAll();
+            showToast(currentOrderNo ? '订单已更新' : `订单已生成：${orderNo}`);
+            currentOrderNo = orderNo;
+            openOrderDetail(orderNo); // 重新加载，刷新逾期状态显示
+        }
+
+        function copyCurrentOrder() {
+            if (!currentOrderNo) return;
+            currentOrderNo = null;
+            document.getElementById('detailTitle').innerText = '📋 复制订单（尚未保存，请核对后点保存）';
+            document.getElementById('fOrderNo').value = '（保存时自动生成）';
+            document.getElementById('fOrderDate').value = getToday();
+            document.getElementById('fDeliveryDate').value = '';
+            document.getElementById('fCompleted').checked = false;
+            document.getElementById('fPaid').checked = false;
+            document.getElementById('fRemark').value = '';
+            document.getElementById('fWasOverdue').value = '0';
+            document.getElementById('rescheduleHint').classList.add('hidden');
+            document.getElementById('rescheduleDateGroup').classList.add('hidden');
+            document.getElementById('deleteOrderBtn').style.display = 'none';
+            document.getElementById('copyOrderBtn').style.display = 'none';
+            showToast('已复制，供应商/货品信息已带入，请核对后保存');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function duplicateOrderFromList(orderNo) {
+            openOrderDetail(orderNo);
+            copyCurrentOrder();
+        }
+
+        function deleteCurrentOrder() {
+            if (!currentOrderNo) return;
+            if (!confirm(`删除订单 ${currentOrderNo}？\n（删除后该订单号不会再被使用，仍可通过"显示已删除订单"查到）`)) return;
+            let idx = orders.findIndex(o => o.orderNo === currentOrderNo);
+            if (idx !== -1) {
+                orders[idx].deleted = true;
+                orders[idx].deletedAt = getToday();
+            }
+            saveAll();
+            showToast('已删除');
+            backToList();
+        }
+
+        // ====== 列表渲染 ======
+        function populateListFilters() {
+            let yearSel = document.getElementById('filterYear');
+            let curYear = yearSel.value;
+            let years = [...new Set(orders.map(o => (o.orderDate || '').slice(0, 4)).filter(Boolean))].sort().reverse();
+            yearSel.innerHTML = '<option value="">全部年份</option>' + years.map(y => `<option value="${y}">${y}年</option>`).join('');
+            yearSel.value = curYear;
+        }
+
+        function renderList() {
+            populateListFilters();
+            let kw = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
+            let yearFilter = document.getElementById('filterYear').value;
+            let showDeleted = document.getElementById('showDeletedCheckbox').checked;
+            let today = getToday();
+            let filtered = orders.filter(o => {
+                if (o.deleted && !showDeleted) return false;
+                if (kw) {
+                    let hay = `${o.orderNo} ${o.supplierCompany} ${o.supplierShort}`.toLowerCase();
+                    if (!hay.includes(kw)) return false;
+                }
+                if (yearFilter && (o.orderDate || '').slice(0, 4) !== yearFilter) return false;
+                return true;
+            });
+            filtered.sort((a, b) => (b.orderNo || '').localeCompare(a.orderNo || ''));
+
+            let html = filtered.map(o => {
+                if (o.deleted) {
+                    return `<tr style="opacity:0.5;">
+                        <td>${o.orderNo} <span class="badge badge-overdue">已删除</span></td>
+                        <td>${escapeHtml(o.supplierShort) || '—'}</td>
+                        <td colspan="7" style="color:#94a3b8;">删除时间：${formatDate(o.deletedAt)}</td>
+                        <td>—</td><td>—</td>
+                    </tr>`;
+                }
+                let totalQty = (o.items || []).reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
+                let totalAmount = (o.items || []).reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+                let overdue = isOrderOverdue(o, today);
+                return `<tr class="${overdue ? 'overdue-row' : ''}">
+                    <td><span class="order-link" onclick="openOrderDetail('${o.orderNo}')">${o.orderNo}</span></td>
+                    <td>${escapeHtml(o.supplierShort) || '—'}</td>
+                    <td>${totalQty}</td>
+                    <td>${totalAmount.toFixed(2)}</td>
+                    <td>${formatDate(o.deliveryDate)}</td>
+                    <td>${overdue ? '<span class="badge badge-overdue">⚠️ 逾期</span>' : '<span class="badge badge-yes">正常</span>'}</td>
+                    <td>${o.followUpDate ? formatDate(o.followUpDate) + (o.overdueCount ? ` <span class="badge badge-reschedule">🔄${o.overdueCount}次</span>` : '') : '—'}</td>
+                    <td>${o.completed ? '<span class="badge badge-yes">已完成</span>' : '<span class="badge badge-no">未完成</span>'}</td>
+                    <td>${o.paid ? '<span class="badge badge-yes">已付款</span>' : '<span class="badge badge-no">未付款</span>'}</td>
+                    <td style="max-width:150px;">${escapeHtml(o.remark) || '—'}</td>
+                    <td><button class="btn btn-outline btn-sm" onclick="duplicateOrderFromList('${o.orderNo}')">📋 复制</button></td>
+                </tr>`;
+            }).join('');
+            document.getElementById('orderTableBody').innerHTML = html || '<tr><td colspan="11" style="padding:30px;text-align:center;">暂无订单</td></tr>';
+        }
+
+        // ====== 历史价格查询 ======
+        function openPriceHistoryModal() {
+            let sel = document.getElementById('phSupplierSelect');
+            let names = [...new Set(orders.map(o => o.supplierCompany).filter(Boolean))].sort();
+            sel.innerHTML = '<option value="">-- 请选择供应商 --</option>' + names.map(n => `<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+            document.getElementById('phProductKeyword').value = '';
+            document.getElementById('phSizeKeyword').value = '';
+            document.getElementById('priceHistoryBody').innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;">请选择供应商后点查询</td></tr>';
+            document.getElementById('priceHistoryModal').classList.add('active');
+        }
+
+        function runPriceHistoryQuery() {
+            let supplier = document.getElementById('phSupplierSelect').value;
+            if (!supplier) { showToast('请先选择供应商', 'error'); return; }
+            let nameKw = document.getElementById('phProductKeyword').value.trim().toLowerCase();
+            let sizeKw = document.getElementById('phSizeKeyword').value.trim().toLowerCase();
+
+            let rows = [];
+            orders.filter(o => o.supplierCompany === supplier).forEach(o => {
+                (o.items || []).forEach(it => {
+                    if (nameKw && !(it.name || '').toLowerCase().includes(nameKw)) return;
+                    if (sizeKw && !(it.size || '').toLowerCase().includes(sizeKw)) return;
+                    rows.push({ date: o.orderDate, orderNo: o.orderNo, name: it.name, size: it.size, qty: it.qty, price: it.price });
+                });
+            });
+            rows.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
+            let html = rows.map(r => `
+                <tr>
+                    <td>${formatDate(r.date)}</td>
+                    <td>${escapeHtml(r.orderNo)}</td>
+                    <td>${escapeHtml(r.name)}</td>
+                    <td>${escapeHtml(r.size)}</td>
+                    <td>${escapeHtml(r.qty)}</td>
+                    <td>${escapeHtml(r.price)}</td>
+                </tr>
+            `).join('');
+            document.getElementById('priceHistoryBody').innerHTML = html || '<tr><td colspan="6" style="padding:20px;text-align:center;">没有找到匹配的历史记录</td></tr>';
+        }
+
+        // ====== 导出订购合同（Excel固定排版，方便另存为PDF）======
+        function exportOrderContract() {
+            if (!currentOrderNo) { showToast('请先保存订单再导出', 'error'); return; }
+            let o = orders.find(x => x.orderNo === currentOrderNo);
+            if (!o) { showToast('未找到订单数据', 'error'); return; }
+
+            let items = o.items || [];
+            let totalQty = items.reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
+            let totalAmount = items.reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
+
+            const thin = { style: 'thin', color: { rgb: '000000' } };
+            const border = { top: thin, bottom: thin, left: thin, right: thin };
+            const titleFont = { name: 'Arial', sz: 18, bold: true };
+            const headFont = { name: 'Arial', sz: 10, bold: true };
+            const normalFont = { name: 'Arial', sz: 10 };
+            const boldFont = { name: 'Arial', sz: 10, bold: true };
+            const centerAlign = { horizontal: 'center', vertical: 'center', wrapText: true };
+            const leftAlign = { horizontal: 'left', vertical: 'center', wrapText: true };
+            const rightAlign = { horizontal: 'right', vertical: 'center', wrapText: true };
+
+            let aoa = [];
+            let merges = [];
+            function addRow(cells) { aoa.push(cells); return aoa.length - 1; }
+            function cell(v, font, align, brd) {
+                let s = { font: font || normalFont, alignment: align || leftAlign };
+                if (brd) s.border = brd;
+                return { v: v == null ? '' : v, t: 's', s };
+            }
+
+            // 标题
+            let rTitle = addRow([cell('订购合同', titleFont, centerAlign), '', '', '', '', '', '']);
+            merges.push({ s: { r: rTitle, c: 0 }, e: { r: rTitle, c: 6 } });
+
+            let rNo = addRow(['', '', '', '', cell(`合同编号：${o.orderNo}`, boldFont, { horizontal: 'right', vertical: 'center' }), '', '']);
+            merges.push({ s: { r: rNo, c: 4 }, e: { r: rNo, c: 6 } });
+
+            // 供货单位（供应商）/ 购货单位（我方）
+            let rHeadLbl = addRow([
+                cell('供货单位（供应商）', headFont, leftAlign, border), '', '',
+                cell('购货单位', headFont, leftAlign, border), '', '', ''
+            ]);
+            merges.push({ s: { r: rHeadLbl, c: 0 }, e: { r: rHeadLbl, c: 2 } });
+            merges.push({ s: { r: rHeadLbl, c: 3 }, e: { r: rHeadLbl, c: 6 } });
+
+            let supplierText = `${o.supplierCompany}\n地址：${o.supplierAddress || ''}\n电话：${o.supplierPhone || ''}\n联系人：${o.supplierContact || ''}`;
+            let buyerText = `${BUYER.name}\n地址：${BUYER.address}\n电话：${BUYER.tel}\n联系人：${BUYER.contact}`;
+            let rInfo = addRow([cell(supplierText, normalFont, leftAlign, border), '', '', cell(buyerText, normalFont, leftAlign, border), '', '', '']);
+            merges.push({ s: { r: rInfo, c: 0 }, e: { r: rInfo, c: 2 } });
+            merges.push({ s: { r: rInfo, c: 3 }, e: { r: rInfo, c: 6 } });
+
+            // 货品表格
+            let rTblHead = addRow([
+                cell('序号', headFont, centerAlign, border),
+                cell('品名', headFont, centerAlign, border), '',
+                cell('尺寸/规格', headFont, centerAlign, border),
+                cell('价格', headFont, centerAlign, border),
+                cell('数量', headFont, centerAlign, border),
+                cell('总额', headFont, centerAlign, border)
+            ]);
+            merges.push({ s: { r: rTblHead, c: 1 }, e: { r: rTblHead, c: 2 } });
+
+            items.forEach((it, i) => {
+                let r = addRow([
+                    cell(i + 1, normalFont, centerAlign, border),
+                    cell(it.name, normalFont, leftAlign, border), '',
+                    cell(it.size, normalFont, centerAlign, border),
+                    cell(it.price, normalFont, rightAlign, border),
+                    cell(it.qty, normalFont, centerAlign, border),
+                    cell(it.amount, normalFont, rightAlign, border)
+                ]);
+                merges.push({ s: { r: r, c: 1 }, e: { r: r, c: 2 } });
+            });
+
+            let rTotal = addRow([
+                cell('合计', boldFont, centerAlign, border), '', '', '', '',
+                cell(totalQty, boldFont, centerAlign, border),
+                cell(totalAmount.toFixed(2), boldFont, rightAlign, border)
+            ]);
+            merges.push({ s: { r: rTotal, c: 0 }, e: { r: rTotal, c: 4 } });
+
+            addRow(['']);
+
+            // 交期/包装要求/图纸备注/备注
+            let noteLines = [];
+            if (o.deliveryDate) noteLines.push(`交期：${o.deliveryDate}`);
+            if (o.packing) noteLines.push(`包装要求：${o.packing}`);
+            if (o.drawingNote) noteLines.push(`图纸备注：${o.drawingNote}`);
+            if (o.remark) noteLines.push(`备注：${o.remark}`);
+            if (noteLines.length) {
+                let rNotes = addRow([cell(noteLines.join('\n'), normalFont, leftAlign), '', '', '', '', '', '']);
+                merges.push({ s: { r: rNotes, c: 0 }, e: { r: rNotes, c: 6 } });
+                aoa[aoa.length - 1] = aoa[rNotes];
+            }
+
+            let ws = XLSX.utils.aoa_to_sheet(aoa);
+            ws['!merges'] = merges;
+            ws['!cols'] = [{ wch: 6 }, { wch: 14 }, { wch: 12 }, { wch: 16 }, { wch: 10 }, { wch: 8 }, { wch: 12 }];
+            ws['!rows'] = aoa.map((row, i) => {
+                if (i === rInfo) return { hpx: 70 };
+                if (noteLines.length && i === aoa.length - 1) return { hpx: 16 * noteLines.length };
+                return { hpx: 22 };
+            });
+
+            let wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, '订购合同');
+            XLSX.writeFile(wb, `订购合同_${o.orderNo}.xlsx`);
+            showToast('合同已导出，用Excel打开后可直接"文件→导出→创建PDF"另存为PDF');
         }
     </script>
 </body>
