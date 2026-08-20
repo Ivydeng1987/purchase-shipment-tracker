@@ -932,9 +932,10 @@
             let html = items.map((it, i) => {
                 let usedRecord = usedCustomerOrderItems.find(u => u.customerOrderNo === orderNo && u.name === it.name && u.size === it.size);
                 let usedBadge = usedRecord ? `<span class="badge-used">已勾选 ${formatDate(usedRecord.usedAt)}</span>` : '';
+                let costNote = it.cost ? `　采购成本参考:${escapeHtml(it.cost)}` : '';
                 return `<div class="import-item-row">
                     <input type="checkbox" class="import-check" data-idx="${i}" checked>
-                    <span style="flex:1;">${escapeHtml(it.name)}　${escapeHtml(it.size)}　数量:${escapeHtml(it.qty)}</span>
+                    <span style="flex:1;">${escapeHtml(it.name)}　${escapeHtml(it.size)}　数量:${escapeHtml(it.qty)}${costNote}</span>
                     ${usedBadge}
                 </div>`;
             }).join('');
@@ -960,8 +961,9 @@
                 let idx = parseInt(c.dataset.idx);
                 let it = items[idx];
                 if (!it) return;
-                // 只带品名/尺寸/数量，不带客户订单里的单价（那是卖给客户的价格，不是采购价）
-                toImport.push({ name: it.name || '', size: it.size || '', qty: it.qty || '', price: '', amount: '' });
+                // 品名/尺寸/数量正常带过来；单价用客户订单里的"采购成本"字段（不是卖给客户的单价，那个是两回事），
+                // 依然可以在采购单里手动改，这里只是省得你重新去查一遍
+                toImport.push({ name: it.name || '', size: it.size || '', qty: it.qty || '', price: it.cost || '', amount: '' });
                 let usedRecord = usedCustomerOrderItems.find(u => u.customerOrderNo === orderNo && u.name === it.name && u.size === it.size);
                 if (usedRecord) repeats.push(`${it.name} ${it.size}`);
             });
