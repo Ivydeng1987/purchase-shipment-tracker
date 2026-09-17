@@ -727,8 +727,7 @@
                 }
 
                 targets.forEach((t, i) => {
-                    // 保留原文，格式："中文翻译（English original）"，方便你核对翻得准不准，也方便万一AI翻错了自己改
-                    t.input.value = `${translations[i]}（${t.originalName}）`;
+                    t.input.value = translations[i];
                 });
                 updateItemsTotal();
                 showToast(`已翻译 ${targets.length} 条品名，请核对一下准确性`);
