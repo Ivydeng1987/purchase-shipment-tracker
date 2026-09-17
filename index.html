@@ -32,6 +32,7 @@
         .btn-outline:hover { background: #f1f5f9; }
         .btn-danger { background: #fee2e2; color: #dc2626; }
         .btn-sm { padding: 4px 10px; font-size: 11px; }
+        .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .card { background: white; border-radius: 14px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); }
         .card h2 { font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
@@ -191,6 +192,7 @@
                         <tbody id="itemsTableBody"></tbody>
                     </table>
                     <button class="btn btn-outline btn-sm" onclick="addItemRow()">➕ 添加一行</button>
+                    <button class="btn btn-outline btn-sm" id="translateNamesBtn" onclick="translateItemNames()">🌐 翻译品名</button>
                     <div class="items-total" id="itemsTotalDisplay">合计数量：0　｜　合计金额：0.00</div>
                 </div>
 
@@ -671,6 +673,71 @@
                 if (allEmpty) r.remove();
             }
             items.forEach(it => addItemRow(it));
+        }
+
+        // ====== AI翻译品名（复用报价系统那个AI询价助手同款接口，只是换一个systemPrompt） ======
+        async function translateItemNames() {
+            let rows = document.querySelectorAll('#itemsTableBody tr');
+            let targets = []; // { row, input, originalName }
+            rows.forEach(r => {
+                let input = r.querySelector('.item-name');
+                let name = input.value.trim();
+                // 已经是中文的跳过，不用再翻一遍；纯数字/型号（没有一个字母）大概率是货号，也跳过
+                if (!name) return;
+                if (/[\u4e00-\u9fa5]/.test(name)) return;
+                if (!/[a-zA-Z]/.test(name)) return;
+                targets.push({ input, originalName: name });
+            });
+
+            if (targets.length === 0) {
+                showToast('没有找到需要翻译的英文品名（可能都已经是中文，或表格是空的）', 'error');
+                return;
+            }
+
+            let btn = document.getElementById('translateNamesBtn');
+            btn.disabled = true;
+            btn.innerText = '🌐 翻译中...';
+
+            try {
+                let systemPrompt = `你是磨具/精密刀具/工业泵阀行业的中英文品名翻译专家，熟悉行业内的习惯说法（例如 End Mill 翻成"端铣刀"而不是"末端磨坊"）。
+接下来会给你一个JSON数组，里面是若干条英文（或中英混杂）的品名。
+请把每一条翻译成国内供应商能看懂的、符合行业习惯的中文品名，尺寸/型号/规格代码本身不用翻译、原样保留在名字里即可。
+必须严格按以下JSON格式返回，不要有任何多余的文字说明：
+{"translations": ["翻译结果1", "翻译结果2", ...]}
+数组顺序必须跟输入的顺序完全一致，数量也必须完全一致。`;
+                let userMessage = JSON.stringify(targets.map(t => t.originalName));
+
+                let res = await fetch(`${WORKER_URL}/ai/parse-rfq`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ systemPrompt, userMessage })
+                });
+                let data = await res.json();
+                if (!res.ok) throw new Error(data.error || '翻译服务出错');
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(data.text);
+                } catch (e) {
+                    throw new Error('AI返回的内容不是合法的JSON，翻译失败');
+                }
+                let translations = parsed.translations;
+                if (!Array.isArray(translations) || translations.length !== targets.length) {
+                    throw new Error('AI返回的翻译条数跟品名条数对不上，为避免张冠李戴，本次不做替换');
+                }
+
+                targets.forEach((t, i) => {
+                    // 保留原文，格式："中文翻译（English original）"，方便你核对翻得准不准，也方便万一AI翻错了自己改
+                    t.input.value = `${translations[i]}（${t.originalName}）`;
+                });
+                updateItemsTotal();
+                showToast(`已翻译 ${targets.length} 条品名，请核对一下准确性`);
+            } catch (e) {
+                showToast('翻译失败：' + e.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = '🌐 翻译品名';
+            }
         }
 
         // ====== 订单号生成 ======
