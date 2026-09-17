@@ -709,7 +709,7 @@
 
                 let res = await fetch(`${WORKER_URL}/ai/parse-rfq`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'X-Access-Token': ACCESS_TOKEN },
                     body: JSON.stringify({ systemPrompt, userMessage })
                 });
                 let data = await res.json();
