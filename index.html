@@ -940,7 +940,7 @@
             let today = getToday();
             let filtered = orders.filter(o => {
                 if (o.deleted && !showDeleted) return false;
-                if (urgentOnly && !o.urgent) return false;
+                if (urgentOnly && !(o.urgent && !o.completed)) return false;
                 if (kw) {
                     let hay = `${o.orderNo} ${o.supplierCompany} ${o.supplierShort}`.toLowerCase();
                     if (!hay.includes(kw)) return false;
@@ -950,7 +950,7 @@
             });
             // 加急订单排到最前面，方便一眼看到，同等紧急度内仍按订单号新到旧排
             filtered.sort((a, b) => {
-                if (!!b.urgent !== !!a.urgent) return (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0);
+                if ((!!b.urgent && !b.completed) !== (!!a.urgent && !a.completed)) return ((b.urgent && !b.completed) ? 1 : 0) - ((a.urgent && !a.completed) ? 1 : 0);
                 return (b.orderNo || '').localeCompare(a.orderNo || '');
             });
 
@@ -966,8 +966,9 @@
                 let totalQty = (o.items || []).reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
                 let totalAmount = (o.items || []).reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
                 let overdue = isOrderOverdue(o, today);
-                let rowClasses = [overdue ? 'overdue-row' : '', o.urgent ? 'urgent-row' : ''].filter(Boolean).join(' ');
-                let urgentBadge = o.urgent ? ' <span class="badge badge-urgent">⚡加急</span>' : '';
+                let stillUrgent = !!o.urgent && !o.completed;
+                let rowClasses = [overdue ? 'overdue-row' : '', stillUrgent ? 'urgent-row' : ''].filter(Boolean).join(' ');
+                let urgentBadge = stillUrgent ? ' <span class="badge badge-urgent">⚡加急</span>' : '';
                 return `<tr class="${rowClasses}">
                     <td><span class="order-link" onclick="openOrderDetail('${o.orderNo}')">${o.orderNo}</span>${urgentBadge}</td>
                     <td>${escapeHtml(o.supplierShort) || '—'}</td>
