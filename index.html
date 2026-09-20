@@ -51,6 +51,12 @@
         .items-table th { background: #f8fafc; padding: 6px 8px; text-align: left; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
         .items-table td { padding: 4px; border-bottom: 1px solid #f1f5f9; }
         .items-table input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 12px; }
+        .name-search-wrap { position: relative; }
+        .name-suggest { display: none; position: absolute; z-index: 50; top: 100%; left: 0; width: 300px; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,0.12); margin-top: 2px; }
+        .name-suggest.show { display: block; }
+        .name-suggest-item { padding: 7px 10px; font-size: 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; line-height: 1.5; }
+        .name-suggest-item:hover { background: #f8fafc; }
+        .name-suggest-item:last-child { border-bottom: none; }
         .items-table .del-row { color: #dc2626; cursor: pointer; background: none; border: none; font-size: 14px; }
         .items-total { text-align: right; font-size: 13px; font-weight: 600; color: #0e4b6e; margin-bottom: 12px; padding: 8px 12px; background: #f0f9ff; border-radius: 8px; }
 
@@ -284,6 +290,7 @@
         <div class="modal" style="max-width:700px;">
             <h2>📥 从客户订单导入货品</h2>
             <div id="importOrderListView">
+                <input type="text" id="importSearchInput" placeholder="🔍 搜索客户名/单号/品名/尺寸关键词..." oninput="renderImportOrderList()" style="width:100%; padding:8px 12px; border:1px solid #e2e8f0; border-radius:30px; font-size:12px; margin-bottom:10px; outline:none;">
                 <div class="mini-list" id="importOrderList"><div class="mini-list-item">加载中...</div></div>
             </div>
             <div id="importItemsView" class="hidden">
@@ -631,8 +638,8 @@
             let tbody = document.getElementById('itemsTableBody');
             let tr = document.createElement('tr');
             tr.innerHTML = `
-                <td><input type="text" class="item-name" value="${escapeHtml(item.name)}"></td>
-                <td><input type="text" class="item-size" value="${escapeHtml(item.size)}"></td>
+                <td><div class="name-search-wrap"><input type="text" class="item-name" value="${escapeHtml(item.name)}" autocomplete="off" oninput="onItemFilterInput(this)" onfocus="onItemFilterInput(this)"><div class="name-suggest"></div></div></td>
+                <td><input type="text" class="item-size" value="${escapeHtml(item.size)}" autocomplete="off" oninput="onItemFilterInput(this)" onfocus="onItemFilterInput(this)"></td>
                 <td><input type="text" class="item-price" value="${escapeHtml(item.price)}" oninput="updateItemsTotal()"></td>
                 <td><input type="text" class="item-qty" value="${escapeHtml(item.qty)}" oninput="updateItemsTotal()"></td>
                 <td><input type="text" class="item-amount" value="${escapeHtml(item.amount || '')}" readonly style="background:#f8fafc;"></td>
@@ -641,6 +648,66 @@
             tbody.appendChild(tr);
             updateItemsTotal();
         }
+
+        // 在本系统自己积累的历史采购单里查找匹配的品名/尺寸（不依赖客户订单系统那边有没有做单），
+        // 品名和尺寸输入框共用同一个建议框，按当前行两个框合起来的文字去匹配
+        function searchHistoricalItems(kw) {
+            let kwLower = kw.toLowerCase();
+            let matches = [];
+            let seen = new Set();
+            let sortedOrders = orders.filter(o => !o.deleted).slice().sort((a, b) => (b.orderNo || '').localeCompare(a.orderNo || ''));
+            for (let o of sortedOrders) {
+                for (let it of (o.items || [])) {
+                    let hay = `${it.name || ''} ${it.size || ''}`.toLowerCase();
+                    if (!hay.includes(kwLower)) continue;
+                    let key = `${it.name || ''}::${it.size || ''}::${o.supplierCompany || ''}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    matches.push({ name: it.name || '', size: it.size || '', price: it.price || '', supplier: o.supplierShort || o.supplierCompany || '', orderDate: o.orderDate || '' });
+                    if (matches.length >= 8) break;
+                }
+                if (matches.length >= 8) break;
+            }
+            return matches;
+        }
+
+        function onItemFilterInput(triggerEl) {
+            let tr = triggerEl.closest('tr');
+            let box = tr.querySelector('.name-suggest');
+            let nameVal = tr.querySelector('.item-name').value.trim();
+            let sizeVal = tr.querySelector('.item-size').value.trim();
+            let kw = `${nameVal} ${sizeVal}`.trim();
+            if (!kw) { box.classList.remove('show'); box.innerHTML = ''; return; }
+            let matches = searchHistoricalItems(kw);
+            if (matches.length === 0) { box.classList.remove('show'); box.innerHTML = ''; return; }
+            box.innerHTML = matches.map(m => `
+                <div class="name-suggest-item" onclick="applyHistoricalItem(this)" data-name="${escapeHtml(m.name)}" data-size="${escapeHtml(m.size)}" data-price="${escapeHtml(m.price)}">
+                    <b>${escapeHtml(m.name)}</b>${m.size ? '　' + escapeHtml(m.size) : ''}<br>
+                    <span style="color:#94a3b8;">${escapeHtml(m.supplier) || '—'} ｜ ${m.price ? '上次单价:' + escapeHtml(m.price) : '无历史单价'} ｜ ${formatDate(m.orderDate)}</span>
+                </div>
+            `).join('');
+            box.classList.add('show');
+        }
+
+        function applyHistoricalItem(el) {
+            let tr = el.closest('tr');
+            if (!tr) return;
+            tr.querySelector('.item-name').value = el.dataset.name;
+            tr.querySelector('.item-size').value = el.dataset.size;
+            if (el.dataset.price) tr.querySelector('.item-price').value = el.dataset.price;
+            updateItemsTotal();
+            let box = el.closest('.name-suggest');
+            box.classList.remove('show');
+            box.innerHTML = '';
+        }
+
+        // 点建议框以外的地方，把所有还开着的建议框收起来
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.name-search-wrap')) {
+                document.querySelectorAll('.name-suggest.show').forEach(el => { el.classList.remove('show'); });
+            }
+        });
+
         function updateItemsTotal() {
             let rows = document.querySelectorAll('#itemsTableBody tr');
             let totalQty = 0, totalAmount = 0;
@@ -1035,6 +1102,7 @@
             document.getElementById('importModal').classList.add('active');
             document.getElementById('importOrderListView').classList.remove('hidden');
             document.getElementById('importItemsView').classList.add('hidden');
+            document.getElementById('importSearchInput').value = '';
 
             let listEl = document.getElementById('importOrderList');
             listEl.innerHTML = '<div class="mini-list-item">正在加载客户订单列表...</div>';
@@ -1042,18 +1110,39 @@
             if (!importCache) {
                 importCache = await fetchCustomerOrders();
             }
+            renderImportOrderList();
+        }
+
+        function renderImportOrderList() {
+            let listEl = document.getElementById('importOrderList');
+            let kw = (document.getElementById('importSearchInput')?.value || '').trim().toLowerCase();
             let list = (importCache || []).filter(o => !o.deleted);
+            if (kw) {
+                list = list.filter(o => {
+                    let itemsHay = (o.items || []).map(it => `${it.name || ''} ${it.size || ''}`).join(' ');
+                    let hay = `${o.orderNo} ${o.customerCompany || ''} ${o.customerShort || ''} ${itemsHay}`.toLowerCase();
+                    return hay.includes(kw);
+                });
+            }
             list.sort((a, b) => (b.orderNo || '').localeCompare(a.orderNo || ''));
 
             if (list.length === 0) {
-                listEl.innerHTML = '<div class="mini-list-item">没有找到客户订单数据</div>';
+                listEl.innerHTML = `<div class="mini-list-item">${kw ? '没有匹配的客户订单' : '没有找到客户订单数据'}</div>`;
                 return;
             }
 
             listEl.innerHTML = list.map(o => {
-                let itemCount = (o.items || []).length;
+                let items = o.items || [];
+                let itemCount = items.length;
+                // 直接把品名+尺寸列出来，不用点开每份客户订单才知道里面是什么，最多显示4条，超出的用"等N条"收尾
+                let namePreview = items
+                    .filter(it => it.name || it.size)
+                    .map(it => it.size ? `${it.name || ''} ${it.size}`.trim() : (it.name || ''));
+                let itemNamesLine = namePreview.length
+                    ? `<br><span style="color:#64748b;">📦 ${escapeHtml(namePreview.slice(0, 4).join('、'))}${namePreview.length > 4 ? `等${namePreview.length}条` : ''}</span>`
+                    : '';
                 return `<div class="mini-list-item clickable" onclick='selectImportOrder(${JSON.stringify(o.orderNo)})'>
-                    <div class="info"><b>${escapeHtml(o.orderNo)}　${escapeHtml(o.customerShort || o.customerCompany || '')}</b><span>${formatDate(o.orderDate)} ｜ ${itemCount}条货品</span></div>
+                    <div class="info"><b>${escapeHtml(o.orderNo)}　${escapeHtml(o.customerShort || o.customerCompany || '')}</b><span>${formatDate(o.orderDate)} ｜ ${itemCount}条货品${itemNamesLine}</span></div>
                     <span>→</span>
                 </div>`;
             }).join('');
