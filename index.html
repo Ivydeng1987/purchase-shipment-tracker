@@ -66,6 +66,8 @@
         .badge-no { background: #fef3c7; color: #d97706; }
         .badge-overdue { background: #fee2e2; color: #dc2626; }
         .badge-reschedule { background: #fef3c7; color: #92400e; }
+        .badge-urgent { background: #ffe4d6; color: #c2410c; }
+        .urgent-row td:first-child { border-left: 3px solid #f97316; }
 
         .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
         .toolbar input[type="text"] { padding: 6px 14px; border: 1px solid #e2e8f0; border-radius: 30px; font-size: 12px; outline: none; width: 200px; }
@@ -127,6 +129,7 @@
                 <input type="text" id="searchInput" placeholder="🔍 搜索供应商/单号..." oninput="renderList()">
                 <select id="filterYear" onchange="renderList()"><option value="">全部年份</option></select>
                 <label class="checkbox-row" style="margin-left:4px;"><input type="checkbox" id="showDeletedCheckbox" onchange="renderList()"> 显示已删除订单</label>
+                <label class="checkbox-row"><input type="checkbox" id="showUrgentOnlyCheckbox" onchange="renderList()"> ⚡只看加急订单</label>
                 <div style="flex:1;"></div>
                 <button class="btn btn-outline" onclick="openPriceHistoryModal()">📊 历史价格查询</button>
                 <button class="btn btn-primary" onclick="openOrderDetail(null)">➕ 新建采购单</button>
@@ -205,6 +208,7 @@
                     <div class="checkbox-row"><input type="checkbox" id="fCompleted"> <label for="fCompleted">订单已完成</label></div>
                     <div class="checkbox-row"><input type="checkbox" id="fPaid"> <label for="fPaid">已付款</label></div>
                 </div>
+                <div class="checkbox-row" style="margin-bottom:12px;"><input type="checkbox" id="fUrgent"> <label for="fUrgent">⚡ 加急订单（客户要求准时交货，总览列表会特别标注）</label></div>
 
                 <div class="form-group"><label>备注</label><textarea id="fRemark" rows="2"></textarea></div>
                 <input type="hidden" id="fWasOverdue" value="0">
@@ -784,6 +788,7 @@
                 document.getElementById('fDrawingNote').value = o.drawingNote || '';
                 document.getElementById('fCompleted').checked = !!o.completed;
                 document.getElementById('fPaid').checked = !!o.paid;
+                document.getElementById('fUrgent').checked = !!o.urgent;
                 document.getElementById('fRemark').value = o.remark || '';
                 (o.items || []).forEach(it => addItemRow(it));
                 document.getElementById('deleteOrderBtn').style.display = 'inline-flex';
@@ -809,6 +814,7 @@
                 document.getElementById('fDrawingNote').value = '';
                 document.getElementById('fCompleted').checked = false;
                 document.getElementById('fPaid').checked = false;
+                document.getElementById('fUrgent').checked = false;
                 document.getElementById('fRemark').value = '';
                 addItemRow();
                 document.getElementById('deleteOrderBtn').style.display = 'none';
@@ -855,6 +861,7 @@
                 drawingNote: document.getElementById('fDrawingNote').value.trim(),
                 completed: document.getElementById('fCompleted').checked,
                 paid: document.getElementById('fPaid').checked,
+                urgent: document.getElementById('fUrgent').checked,
                 remark: document.getElementById('fRemark').value.trim(),
                 followUpDate: existing ? existing.followUpDate : null,
                 overdueCount: existing ? (existing.overdueCount || 0) : 0
@@ -929,9 +936,11 @@
             let kw = (document.getElementById('searchInput')?.value || '').trim().toLowerCase();
             let yearFilter = document.getElementById('filterYear').value;
             let showDeleted = document.getElementById('showDeletedCheckbox').checked;
+            let urgentOnly = document.getElementById('showUrgentOnlyCheckbox').checked;
             let today = getToday();
             let filtered = orders.filter(o => {
                 if (o.deleted && !showDeleted) return false;
+                if (urgentOnly && !o.urgent) return false;
                 if (kw) {
                     let hay = `${o.orderNo} ${o.supplierCompany} ${o.supplierShort}`.toLowerCase();
                     if (!hay.includes(kw)) return false;
@@ -939,7 +948,11 @@
                 if (yearFilter && (o.orderDate || '').slice(0, 4) !== yearFilter) return false;
                 return true;
             });
-            filtered.sort((a, b) => (b.orderNo || '').localeCompare(a.orderNo || ''));
+            // 加急订单排到最前面，方便一眼看到，同等紧急度内仍按订单号新到旧排
+            filtered.sort((a, b) => {
+                if (!!b.urgent !== !!a.urgent) return (b.urgent ? 1 : 0) - (a.urgent ? 1 : 0);
+                return (b.orderNo || '').localeCompare(a.orderNo || '');
+            });
 
             let html = filtered.map(o => {
                 if (o.deleted) {
@@ -953,8 +966,10 @@
                 let totalQty = (o.items || []).reduce((s, it) => s + (parseFloat(it.qty) || 0), 0);
                 let totalAmount = (o.items || []).reduce((s, it) => s + (parseFloat(it.amount) || 0), 0);
                 let overdue = isOrderOverdue(o, today);
-                return `<tr class="${overdue ? 'overdue-row' : ''}">
-                    <td><span class="order-link" onclick="openOrderDetail('${o.orderNo}')">${o.orderNo}</span></td>
+                let rowClasses = [overdue ? 'overdue-row' : '', o.urgent ? 'urgent-row' : ''].filter(Boolean).join(' ');
+                let urgentBadge = o.urgent ? ' <span class="badge badge-urgent">⚡加急</span>' : '';
+                return `<tr class="${rowClasses}">
+                    <td><span class="order-link" onclick="openOrderDetail('${o.orderNo}')">${o.orderNo}</span>${urgentBadge}</td>
                     <td>${escapeHtml(o.supplierShort) || '—'}</td>
                     <td>${totalQty}</td>
                     <td>${totalAmount.toFixed(2)}</td>
