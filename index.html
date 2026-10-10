@@ -139,6 +139,7 @@
                 <div style="flex:1;"></div>
                 <button class="btn btn-outline" onclick="openPriceHistoryModal()">📊 历史价格查询</button>
                 <button class="btn btn-outline" onclick="openStatsModal()">📈 采购汇总统计</button>
+                <button class="btn btn-outline" onclick="openAiOrderModal(true)">🤖 AI录入采购单</button>
                 <button class="btn btn-primary" onclick="openOrderDetail(null)">➕ 新建采购单</button>
             </div>
             <div class="table-wrapper">
@@ -223,6 +224,7 @@
                 <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                     <button class="btn btn-primary" id="saveOrderBtn" onclick="saveOrder()">💾 保存订单</button>
                     <button class="btn btn-outline" onclick="exportOrderContract()">📥 导出订购合同</button>
+                    <button class="btn btn-outline" onclick="openAiOrderModal(false)">🤖 AI录入</button>
                     <button class="btn btn-outline" onclick="openImportModal()">📥 从客户订单导入货品</button>
                     <button class="btn btn-outline" id="copyOrderBtn" onclick="copyCurrentOrder()" style="display:none;">📋 复制为新订单</button>
                     <button class="btn btn-outline" onclick="backToList()">← 返回列表</button>
@@ -307,6 +309,19 @@
             </div>
             <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:14px;">
                 <button class="btn btn-outline" onclick="closeModal('statsModal')">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== AI录入采购单弹窗 ========== -->
+    <div class="modal-overlay" id="aiOrderModal">
+        <div class="modal" style="max-width:640px;">
+            <h2>🤖 AI录入采购单</h2>
+            <div style="font-size:12px;color:#64748b;margin-bottom:8px;line-height:1.6;">把供应商、货品、数量、单价、交期等信息直接粘贴进来（聊天记录、报价、Excel 复制的内容都可以），AI 会整理填进采购单表单。<b>只填表单，不会自动保存</b>，你核对后再点"保存订单"。</div>
+            <textarea id="aiOrderText" rows="10" placeholder="例如：&#10;供应商：东莞XX五金 张工 138xxxxxxxx&#10;SC-10x50 合金铣刀 D10x50 单价12.5 数量200支&#10;SC-12 合金铣刀 D12x75 单价18 数量100支&#10;交期35天，纸盒包装，急单" style="width:100%;padding:10px;border:1px solid #e2e8f0;border-radius:10px;font-size:13px;font-family:inherit;outline:none;"></textarea>
+            <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:12px;">
+                <button class="btn btn-outline" onclick="closeModal('aiOrderModal')">取消</button>
+                <button class="btn btn-primary" id="aiOrderBtn" onclick="parseAiOrderText()">✨ 识别并填入表单</button>
             </div>
         </div>
     </div>
@@ -833,6 +848,83 @@
             } finally {
                 btn.disabled = false;
                 btn.innerText = '🌐 翻译品名';
+            }
+        }
+
+        // ====== AI录入采购单（同样复用 /ai/parse-rfq 接口，换一个 systemPrompt；只填表单不保存） ======
+        function openAiOrderModal(fromList) {
+            if (fromList) openOrderDetail(null);
+            document.getElementById('aiOrderText').value = '';
+            document.getElementById('aiOrderModal').classList.add('active');
+            setTimeout(() => document.getElementById('aiOrderText').focus(), 50);
+        }
+
+        async function parseAiOrderText() {
+            let text = document.getElementById('aiOrderText').value.trim();
+            if (!text) { showToast('请先粘贴订单内容', 'error'); return; }
+            let btn = document.getElementById('aiOrderBtn');
+            btn.disabled = true; btn.innerText = '✨ 识别中...';
+            try {
+                let systemPrompt = `你是外贸公司采购助理，负责把用户粘贴的杂乱采购信息整理成结构化的采购单。今天是 ${getToday()}。
+只提取原文里明确出现的信息，没有的字段留空字符串，不要编造。品名、尺寸要分开：品名写产品名称/货号，尺寸写规格（如 D10x50、M8x1.25）。
+单价、数量只写数字（不带单位、货币符号）。如果原文写了"交期X天"，请用今天日期推算成 YYYY-MM-DD 填入 deliveryDate；写了具体日期就直接用。
+出现"急""加急""必须准时"等字样时 urgent 为 true，否则 false。
+必须严格按以下JSON格式返回，不要有任何多余的文字、不要markdown代码块：
+{"supplierCompany":"","supplierShort":"","supplierContact":"","supplierPhone":"","supplierAddress":"","deliveryDate":"","packing":"","drawingNote":"","remark":"","urgent":false,"items":[{"name":"","size":"","price":"","qty":""}]}`;
+                let res = await fetch(`${WORKER_URL}/ai/parse-rfq`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Access-Token': ACCESS_TOKEN },
+                    body: JSON.stringify({ systemPrompt, userMessage: text })
+                });
+                let data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'AI服务出错');
+                let raw = String(data.text || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+                let st = raw.indexOf('{'), en = raw.lastIndexOf('}');
+                let parsed;
+                try { parsed = JSON.parse(raw.slice(st, en + 1)); } catch (e) { throw new Error('AI返回的内容无法识别，请换个写法再试'); }
+
+                let setIf = (id, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') document.getElementById(id).value = String(v).trim(); };
+
+                // 先对上供应商资料库里已有的供应商（公司名/简称互相包含即视为同一家），资料库信息优先补全
+                let q = (parsed.supplierCompany || '').trim().toLowerCase();
+                let qs = (parsed.supplierShort || '').trim().toLowerCase();
+                let matched = suppliers.find(x => {
+                    let c = (x.company || '').toLowerCase(), sh = (x.shortName || '').toLowerCase();
+                    return (q && c && (c.includes(q) || q.includes(c))) || (qs && sh && (sh.includes(qs) || qs.includes(sh))) || (q && sh && (sh.includes(q) || q.includes(sh)));
+                });
+                if (matched) {
+                    document.getElementById('fSupplierSelect').value = matched.id;
+                    fillSupplierFromSelect();
+                    setIf('fSupplierContact', parsed.supplierContact);
+                    setIf('fSupplierPhone', parsed.supplierPhone);
+                } else {
+                    setIf('fSupplierCompany', parsed.supplierCompany);
+                    setIf('fSupplierShort', parsed.supplierShort);
+                    setIf('fSupplierContact', parsed.supplierContact);
+                    setIf('fSupplierPhone', parsed.supplierPhone);
+                    setIf('fSupplierAddress', parsed.supplierAddress);
+                }
+                if (/^\d{4}-\d{2}-\d{2}$/.test(parsed.deliveryDate || '')) document.getElementById('fDeliveryDate').value = parsed.deliveryDate;
+                setIf('fPacking', parsed.packing);
+                setIf('fDrawingNote', parsed.drawingNote);
+                setIf('fRemark', parsed.remark);
+                if (parsed.urgent === true) document.getElementById('fUrgent').checked = true;
+
+                let items = (Array.isArray(parsed.items) ? parsed.items : []).map(it => ({
+                    name: String(it.name || '').trim(),
+                    size: String(it.size || '').trim(),
+                    price: String(it.price ?? '').trim(),
+                    qty: String(it.qty ?? '').trim()
+                })).filter(it => it.name || it.size || it.qty);
+                appendItems(items);
+                updateItemsTotal();
+
+                closeModal('aiOrderModal');
+                showToast(`已识别：${matched ? '供应商已对上资料库「' + (matched.shortName || matched.company) + '」，' : ''}${items.length} 条货品，请核对后保存`);
+            } catch (e) {
+                showToast('AI识别失败：' + e.message, 'error');
+            } finally {
+                btn.disabled = false; btn.innerText = '✨ 识别并填入表单';
             }
         }
 
